@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"qlabcoin/internal/qlab"
 )
@@ -30,6 +31,10 @@ func main() {
 		transition(os.Args[2:])
 	case "state":
 		state(os.Args[2:])
+	case "history":
+		history(os.Args[2:])
+	case "verify-chain":
+		verifyChain(os.Args[2:])
 	case "bitcoin":
 		bitcoin()
 	default:
@@ -47,14 +52,16 @@ Commands:
   qlabcoin level <n>
   qlabcoin challenge <n>
   qlabcoin verify <n> -solution <k>
-  qlabcoin submit <n> -solution <k> -circuit <sha256:...> [-backend <json>] [-registry <path>]
-  qlabcoin transition <n> <state> [-registry <path>]
-  qlabcoin state [-registry <path>]
+  qlabcoin submit <n> -solution <k> -circuit <sha256:...> [-backend <json>] [-chain <path>]
+  qlabcoin transition <n> <state> [-chain <path>]
+  qlabcoin state [-chain <path>]
+  qlabcoin history [-chain <path>]
+  qlabcoin verify-chain [-chain <path>]
   qlabcoin bitcoin
 
 States: open, claimed, verified, broken, hardened, reopened
-Registry: a local JSON file (default %s); not committed.
-`, qlab.Version, qlab.DefaultRegistryPath)
+Chain: a local append-only JSON file (default %s); the registry is derived from it.
+`, qlab.Version, qlab.DefaultChainPath)
 }
 
 func clock(args []string) {
@@ -171,7 +178,7 @@ func submit(args []string) {
 	solution := fs.Int("solution", 0, "claimed multiplicative order")
 	circuit := fs.String("circuit", "", "circuit hash, e.g. sha256:...")
 	backend := fs.String("backend", "", "backend metadata as JSON object")
-	registry := fs.String("registry", qlab.DefaultRegistryPath, "registry file path")
+	chainPath := fs.String("chain", qlab.DefaultChainPath, "chain file path")
 	_ = fs.Parse(reorderFlags(args))
 	rest := fs.Args()
 	if len(rest) != 1 {
@@ -195,34 +202,63 @@ func submit(args []string) {
 		}
 	}
 	toy := qlab.ToyOrderChallengeForLevel(n)
-	sub := qlab.Submission{
-		Solution:    strconv.Itoa(*solution),
-		CircuitHash: *circuit,
-		Backend:     backendMap,
+
+	// Load chain and derive the current registry to validate against live state.
+	chain := qlab.NewChain(*chainPath)
+	if err := chain.Load(); err != nil {
+		fatal(err)
+	}
+	reg, err := qlab.DeriveRegistry(chain)
+	if err != nil {
+		fatal(err)
 	}
 
-	reg := qlab.NewRegistry(*registry)
-	if err := reg.Load(); err != nil {
-		fatal(err)
-	}
-	err := reg.Submit(n, sub, func() bool {
-		return qlab.VerifyOrder(n, toy.Modulus, toy.Base, *solution)
-	})
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	// Verify the solution classically before recording anything.
+	if !qlab.VerifyOrder(n, toy.Modulus, toy.Base, *solution) {
+		fmt.Fprintf(os.Stderr, "classical verification failed for level %d\n", n)
 		os.Exit(1)
 	}
-	if err := reg.Save(); err != nil {
+	entry, _ := reg.Entry(n)
+	if entry.State != qlab.StateOpen {
+		fmt.Fprintf(os.Stderr, "level %d is %s, not open (cannot submit)\n", n, entry.State)
+		os.Exit(1)
+	}
+
+	now := nowRFC3339()
+	sub := qlab.Submission{
+		ChallengeID:                entry.ChallengeID,
+		Level:                      n,
+		ClaimedLogicalAttackQubits: n,
+		Solution:                   strconv.Itoa(*solution),
+		CircuitHash:                *circuit,
+		Backend:                    backendMap,
+		VerifiedAt:                 now,
+	}
+	ev := qlab.Event{
+		Type:       qlab.EventSubmit,
+		Level:      n,
+		Submission: &sub,
+		Timestamp:  now,
+	}
+	if _, err := chain.Append(ev); err != nil {
 		fatal(err)
 	}
-	entry, _ := reg.Entry(n)
-	printJSON(entry)
+	if err := chain.Save(); err != nil {
+		fatal(err)
+	}
+	// Re-derive to report the post-event state (entry now broken).
+	reg2, err := qlab.DeriveRegistry(chain)
+	if err != nil {
+		fatal(err)
+	}
+	entry2, _ := reg2.Entry(n)
+	printJSON(entry2)
 }
 
 // transition moves a level to a new state via a validated lifecycle edge.
 func transition(args []string) {
 	fs := flag.NewFlagSet("transition", flag.ExitOnError)
-	registry := fs.String("registry", qlab.DefaultRegistryPath, "registry file path")
+	chainPath := fs.String("chain", qlab.DefaultChainPath, "chain file path")
 	_ = fs.Parse(reorderFlags(args))
 	rest := fs.Args()
 	if len(rest) != 2 {
@@ -231,38 +267,106 @@ func transition(args []string) {
 	}
 	n := mustLevel(rest[0])
 	to := qlab.EntryState(rest[1])
-	switch to {
-	case qlab.StateOpen, qlab.StateClaimed, qlab.StateVerified, qlab.StateBroken, qlab.StateHardened, qlab.StateReopened:
-		// ok
-	default:
-		fmt.Fprintf(os.Stderr, "unknown state %q\n", rest[1])
+	evType, ok := transitionEventType(to)
+	if !ok {
+		fmt.Fprintf(os.Stderr, "unknown or non-recordable state %q (recordable: hardened, reopened)\n", rest[1])
 		os.Exit(2)
 	}
-	reg := qlab.NewRegistry(*registry)
-	if err := reg.Load(); err != nil {
+	chain := qlab.NewChain(*chainPath)
+	if err := chain.Load(); err != nil {
+		fatal(err)
+	}
+	reg, err := qlab.DeriveRegistry(chain)
+	if err != nil {
 		fatal(err)
 	}
 	if err := reg.Transition(n, to); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := reg.Save(); err != nil {
+	if _, err := chain.Append(qlab.Event{Type: evType, Level: n, Timestamp: nowRFC3339()}); err != nil {
 		fatal(err)
 	}
-	entry, _ := reg.Entry(n)
+	if err := chain.Save(); err != nil {
+		fatal(err)
+	}
+	reg2, err := qlab.DeriveRegistry(chain)
+	if err != nil {
+		fatal(err)
+	}
+	entry, _ := reg2.Entry(n)
 	printJSON(entry)
 }
 
-// state dumps the full registry as JSON.
+// transitionEventType maps a target state to the event type recorded on chain.
+// Only hardened/reopened are reachable via transition; submit/verified are
+// emitted by submit itself, so other targets are not recordable here.
+func transitionEventType(to qlab.EntryState) (qlab.EventType, bool) {
+	switch to {
+	case qlab.StateHardened:
+		return qlab.EventHarden, true
+	case qlab.StateReopened:
+		return qlab.EventReopen, true
+	}
+	return "", false
+}
+
+// state dumps the registry derived from the chain as JSON.
 func state(args []string) {
 	fs := flag.NewFlagSet("state", flag.ExitOnError)
-	registry := fs.String("registry", qlab.DefaultRegistryPath, "registry file path")
+	chainPath := fs.String("chain", qlab.DefaultChainPath, "chain file path")
 	_ = fs.Parse(reorderFlags(args))
-	reg := qlab.NewRegistry(*registry)
-	if err := reg.Load(); err != nil {
+	chain := qlab.NewChain(*chainPath)
+	if err := chain.Load(); err != nil {
+		fatal(err)
+	}
+	reg, err := qlab.DeriveRegistry(chain)
+	if err != nil {
 		fatal(err)
 	}
 	printJSON(map[string]interface{}{"entries": reg.All()})
+}
+
+// history dumps the full chain (blocks with hashes and events) as JSON.
+func history(args []string) {
+	fs := flag.NewFlagSet("history", flag.ExitOnError)
+	chainPath := fs.String("chain", qlab.DefaultChainPath, "chain file path")
+	_ = fs.Parse(reorderFlags(args))
+	chain := qlab.NewChain(*chainPath)
+	if err := chain.Load(); err != nil {
+		fatal(err)
+	}
+	printJSON(chainHistory{Blocks: chain.Blocks(), LastHash: chain.LastHash()})
+}
+
+type chainHistory struct {
+	Blocks   []qlab.Block `json:"blocks"`
+	LastHash string       `json:"last_hash"`
+}
+
+// verifyChain checks the chain's structural integrity and replays all events.
+func verifyChain(args []string) {
+	fs := flag.NewFlagSet("verify-chain", flag.ExitOnError)
+	chainPath := fs.String("chain", qlab.DefaultChainPath, "chain file path")
+	_ = fs.Parse(reorderFlags(args))
+	chain := qlab.NewChain(*chainPath)
+	if err := chain.Load(); err != nil {
+		fatal(err)
+	}
+	if err := chain.Verify(); err != nil {
+		fmt.Fprintf(os.Stderr, "chain integrity FAILED: %v\n", err)
+		os.Exit(1)
+	}
+	if _, err := qlab.DeriveRegistry(chain); err != nil {
+		fmt.Fprintf(os.Stderr, "chain replay FAILED: %v\n", err)
+		os.Exit(1)
+	}
+	printJSON(map[string]interface{}{
+		"valid":     true,
+		"blocks":    len(chain.Blocks()),
+		"last_hash": chain.LastHash(),
+		"note":      "block hashes are chained correctly and all events replay to a valid registry",
+	})
 }
 
 func bitcoin() {
@@ -289,6 +393,12 @@ func mustLevel(raw string) int {
 func fatal(err error) {
 	fmt.Fprintln(os.Stderr, err)
 	os.Exit(1)
+}
+
+// nowRFC3339 returns the current UTC time in RFC3339, the format used for chain
+// event timestamps and submission VerifiedAt.
+func nowRFC3339() string {
+	return time.Now().UTC().Format(time.RFC3339)
 }
 
 func printJSON(v interface{}) {

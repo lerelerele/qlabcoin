@@ -1,0 +1,56 @@
+{
+  "blocks": [
+    {
+      "index": 0,
+      "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "events": null
+    },
+    {
+      "index": 1,
+      "prev_hash": "91e2a70383636a6a574f1d55fea05077d06e8f4b0de9530d107eccfd510a6a82",
+      "events": [
+        {
+          "type": "submit",
+          "level": 5,
+          "submission": {
+            "challenge_id": "qlab-L005-b6816f32eb",
+            "level": 5,
+            "claimed_logical_attack_qubits": 5,
+            "solution": "36",
+            "circuit_hash": "sha256:example",
+            "backend": {
+              "hardware": "example university lab",
+              "logical_qubits": 5,
+              "notes": "demonstration run",
+              "physical_qubits": 12
+            },
+            "verified_at": "2026-07-01T00:00:00Z"
+          },
+          "timestamp": "2026-07-01T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "prev_hash": "525d2976eda60f61c1e08d905424b6e3047b794da05c8ed022ec7ad15e4450f7",
+      "events": [
+        {
+          "type": "harden",
+          "level": 5,
+          "timestamp": "2026-07-01T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "prev_hash": "a79ee0b0d45b87fb7fec438e24118974fd3b625e4ca348ccc8f83e3cf872f4af",
+      "events": [
+        {
+          "type": "reopen",
+          "level": 5,
+          "timestamp": "2026-07-01T00:00:00Z"
+        }
+      ]
+    }
+  ]
+}

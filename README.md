@@ -47,16 +47,21 @@ go run ./cmd/qlabcoin clock -max 12
 go run ./cmd/qlabcoin level 19
 go run ./cmd/qlabcoin challenge 5            # includes toy-order target for levels 4-18
 go run ./cmd/qlabcoin verify 5 -solution 36  # check a claimed multiplicative order
-go run ./cmd/qlabcoin submit 5 -solution 36 -circuit sha256:...   # verify + advance to broken
+go run ./cmd/qlabcoin submit 5 -solution 36 -circuit sha256:...   # verify + record on chain
 go run ./cmd/qlabcoin transition 5 hardened
 go run ./cmd/qlabcoin transition 5 reopened  # opens the next level
-go run ./cmd/qlabcoin state                  # dump the local registry
+go run ./cmd/qlabcoin state                  # registry derived from the chain
+go run ./cmd/qlabcoin history                # dump the chain (blocks + hashes)
+go run ./cmd/qlabcoin verify-chain           # check chain integrity + replay
 go run ./cmd/qlabcoin bitcoin
 ```
 
-Challenge state is kept in a local JSON file (default `qlabcoin-registry.json`),
-not committed. The lifecycle is `open → claimed → verified → broken → hardened → reopened`;
-`submit` collapses the first three transitions when classical verification passes.
+Challenge state lives on an **append-only event chain** (default
+`qlabcoin-chain.json`, not committed). Each block chains to the previous one by
+`sha256`; the registry is derived by replaying the chain. The lifecycle is
+`open → claimed → verified → broken → hardened → reopened`; `submit` records a
+verified solution and `transition` records harden/reopen events. See
+`docs/CHAIN_FORMAT.md`.
 
 ## Research Cycle
 

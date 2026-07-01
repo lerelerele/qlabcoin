@@ -153,9 +153,16 @@ func (r *Registry) Submit(level int, s Submission, verify func() bool) error {
 		s.ClaimedLogicalAttackQubits = level
 	}
 	s.VerifiedAt = time.Now().UTC().Format(time.RFC3339)
+	applySubmit(e, s)
+	return nil
+}
+
+// applySubmit stamps a verified submission onto an entry and moves it to broken.
+// Shared by the live Submit path and the chain re-derivation path. It assumes
+// the caller has already verified the solution.
+func applySubmit(e *Entry, s Submission) {
 	e.Submission = &s
 	e.State = StateBroken // open → claimed → verified → broken in one accepted step
-	return nil
 }
 
 // Transition moves level to the requested state after validating the edge. The
@@ -166,10 +173,23 @@ func (r *Registry) Transition(level int, to EntryState) error {
 	if !ValidTransition(e.State, to) {
 		return fmt.Errorf("invalid transition for level %d: %s → %s", level, e.State, to)
 	}
+	if err := applyTransition(r, e, to); err != nil {
+		return err
+	}
+	return nil
+}
+
+// applyTransition mutates an entry to the next state and handles the reopen
+// side-effect (opening the next level). Shared by Transition and chain
+// re-derivation so both follow identical rules.
+func applyTransition(r *Registry, e *Entry, to EntryState) error {
 	e.State = to
 	if to == StateReopened {
-		// Advance the clock: open the next level.
-		r.Entry(level + 1)
+		// Advance the clock: open the next level. r may be nil when called in a
+		// context that does not need auto-open (it never is today, but be safe).
+		if r != nil {
+			r.Entry(e.Level + 1)
+		}
 	}
 	return nil
 }

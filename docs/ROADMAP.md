@@ -16,13 +16,13 @@
 - Remaining: classical verification for quantum-primitive (1-3) and toy-ecdlp
   (19+) families.
 
-## Phase 2: Local Chain
+## Phase 2: Local Chain (done)
 
-- Blocks.
-- Challenge registry.
-- Broken-level history.
-- Hardening events.
-- Reopen events.
+- Append-only event chain of blocks, each chained by sha256 to its predecessor.
+- Challenge registry derived by replaying the chain (single source of truth).
+- Broken-level history, hardening events, and reopen events all recorded on chain.
+- CLI: history, verify-chain; submit/transition/state now operate on the chain.
+- Remaining: consensus/network (the chain is local for now).
 
 ## Phase 3: Academic Clock
 
