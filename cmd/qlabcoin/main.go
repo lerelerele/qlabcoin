@@ -37,6 +37,8 @@ func main() {
 		history(os.Args[2:])
 	case "verify-chain":
 		verifyChain(os.Args[2:])
+	case "mitigation":
+		mitigation(os.Args[2:])
 	case "bitcoin":
 		bitcoin()
 	default:
@@ -60,6 +62,7 @@ Commands:
   qlabcoin state [-chain <path>]
   qlabcoin history [-chain <path>]
   qlabcoin verify-chain [-chain <path>]
+  qlabcoin mitigation [-list | -mode <A-F> -request <json> | -chain <path>]
   qlabcoin bitcoin
 
 States: open, claimed, verified, broken, hardened, reopened
@@ -413,7 +416,12 @@ func state(args []string) {
 	if err != nil {
 		fatal(err)
 	}
-	printJSON(map[string]interface{}{"entries": reg.All()})
+	mode := qlab.DeriveMitigationMode(reg)
+	printJSON(map[string]interface{}{
+		"entries":         reg.All(),
+		"mitigation_mode": mode,
+		"mitigation_name": qlab.MitigationModeName(mode),
+	})
 }
 
 // history dumps the full chain (blocks with hashes and events) as JSON.
@@ -456,6 +464,90 @@ func verifyChain(args []string) {
 		"last_hash": chain.LastHash(),
 		"note":      "block hashes are chained correctly and all events replay to a valid registry",
 	})
+}
+
+// mitigation shows the active mitigation posture (derived from the chain) or, with
+// -list, the whole hardening ladder; with -request it evaluates a hypothetical spend.
+func mitigation(args []string) {
+	fs := flag.NewFlagSet("mitigation", flag.ExitOnError)
+	list := fs.Bool("list", false, "list the whole A-F hardening ladder")
+	modeFlag := fs.String("mode", "", "evaluate a spend under this explicit mode (A-F) instead of the derived one")
+	request := fs.String("request", "", "spend request as JSON (pubkey_exposed, address_type, ...)")
+	chainPath := fs.String("chain", qlab.DefaultChainPath, "chain file path")
+	_ = fs.Parse(reorderFlags(args))
+
+	if *list {
+		ladder := qlab.MitigationLadder()
+		out := make([]map[string]string, 0, len(ladder))
+		for _, m := range ladder {
+			out = append(out, map[string]string{
+				"mode": string(m),
+				"name": qlab.MitigationModeName(m),
+				"desc": qlab.MitigationModeDesc(m),
+			})
+		}
+		printJSON(map[string]interface{}{"ladder": out})
+		return
+	}
+
+	// Determine the mode: explicit -mode overrides the derived one.
+	mode := qlab.MitigationMode(*modeFlag)
+	if *modeFlag == "" {
+		chain := qlab.NewChain(*chainPath)
+		if err := chain.Load(); err != nil {
+			fatal(err)
+		}
+		reg, err := qlab.DeriveRegistry(chain)
+		if err != nil {
+			fatal(err)
+		}
+		mode = qlab.DeriveMitigationMode(reg)
+	} else {
+		valid := false
+		for _, m := range qlab.MitigationLadder() {
+			if m == mode {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			fmt.Fprintf(os.Stderr, "unknown mode %q (use A-F)\n", *modeFlag)
+			os.Exit(2)
+		}
+	}
+
+	// No -request: just report the active mode.
+	if *request == "" {
+		printJSON(map[string]interface{}{
+			"mode":       mode,
+			"name":       qlab.MitigationModeName(mode),
+			"desc":       qlab.MitigationModeDesc(mode),
+			"max_broken": maxBrokenFromChain(*chainPath),
+		})
+		return
+	}
+
+	// Evaluate a hypothetical spend under this mode.
+	var req qlab.SpendRequest
+	if err := json.Unmarshal([]byte(*request), &req); err != nil {
+		fmt.Fprintf(os.Stderr, "invalid -request JSON: %v\n", err)
+		os.Exit(2)
+	}
+	printJSON(qlab.EvaluateSpend(mode, req))
+}
+
+// maxBrokenFromChain loads the chain (best-effort) to report the highest broken
+// level alongside the derived mode. Failures are reported as 0.
+func maxBrokenFromChain(chainPath string) int {
+	chain := qlab.NewChain(chainPath)
+	if err := chain.Load(); err != nil {
+		return 0
+	}
+	reg, err := qlab.DeriveRegistry(chain)
+	if err != nil {
+		return 0
+	}
+	return reg.MaxBrokenLevel()
 }
 
 func bitcoin() {

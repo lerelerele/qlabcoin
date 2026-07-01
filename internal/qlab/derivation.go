@@ -95,3 +95,38 @@ func applyEventTransition(r *Registry, level int, to EntryState) error {
 	}
 	return applyTransition(r, e, to)
 }
+
+// Mitigation band boundaries. The highest demonstrated (broken) level maps to a
+// rung of the hardening ladder: the further the academic clock has advanced, the
+// harder the recommended posture. These are deliberately coarse didactic bands,
+// not a scientific claim of when to migrate.
+const (
+	mitBandB = 1    // at least one level broken
+	mitBandC = 5    // order-finding demonstrated at scale
+	mitBandE = 100  // non-trivial curve sizes reachable
+	mitBandF = 1000 // approaching the Bitcoin reference threshold
+)
+
+// mitBandD marks the first ECDLP-shaped demonstration. It mirrors
+// FirstECDLPLevel (19) but is kept as a var because FirstECDLPLevel is derived.
+var mitBandD = FirstECDLPLevel
+
+// DeriveMitigationMode returns the recommended mitigation posture implied by the
+// current derived registry state (i.e. how far the clock has advanced). It does
+// not depend on any explicit "mitigate" event: the chain is the source of truth.
+func DeriveMitigationMode(r *Registry) MitigationMode {
+	m := r.MaxBrokenLevel()
+	switch {
+	case m >= mitBandF:
+		return ModeF
+	case m >= mitBandE:
+		return ModeE
+	case m >= mitBandD:
+		return ModeD
+	case m >= mitBandC:
+		return ModeC
+	case m >= mitBandB:
+		return ModeB
+	}
+	return ModeA
+}

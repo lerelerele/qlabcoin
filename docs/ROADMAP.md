@@ -34,13 +34,16 @@
 - Remaining: signed author identity / external review (the chain is local and
   authorship is not yet cryptographically authenticated).
 
-## Phase 4: Mitigation Lab
+## Phase 4: Mitigation Lab (done)
 
-- Exposed-pubkey mode.
-- Hash-only-address mode.
-- No-live-UTXO-after-exposure rule.
-- Hybrid signature mode.
-- Post-quantum signature mode.
+- Mitigation ladder A-F modeled as declarative postures (see docs/MITIGATION.md):
+  exposed-pubkey (A), hash-only-address (B), no-live-UTXO-after-exposure (C),
+  migration-window (D), hybrid signatures (E), post-quantum signatures (F).
+- Spend evaluation (EvaluateSpend) reports whether a hypothetical spend is
+  acceptable under each posture and why.
+- Active mode is derived from the chain (highest broken level -> rung), not set.
+- CLI: mitigation (-list / -mode / -request); state now reports the derived mode.
+- Remaining: signed author identity, multi-party spend policies.
 
 ## Phase 5: Bitcoin Distance Model
 

@@ -1,0 +1,5 @@
+{
+  "mode": "C",
+  "allowed": false,
+  "reason": "live UTXO on an exposed public key is not allowed"
+}

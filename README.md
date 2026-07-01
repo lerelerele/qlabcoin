@@ -54,6 +54,9 @@ go run ./cmd/qlabcoin reproduce 5 -author labB -circuit sha256:... -result repro
 go run ./cmd/qlabcoin state                  # registry derived from the chain
 go run ./cmd/qlabcoin history                # dump the chain (blocks + hashes)
 go run ./cmd/qlabcoin verify-chain           # check chain integrity + replay
+go run ./cmd/qlabcoin mitigation -list       # the A-F hardening ladder
+go run ./cmd/qlabcoin mitigation             # active posture derived from the clock
+go run ./cmd/qlabcoin mitigation -mode C -request '{"pubkey_exposed":true,"has_live_utxo":true}'
 go run ./cmd/qlabcoin bitcoin
 ```
 

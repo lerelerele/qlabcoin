@@ -142,6 +142,20 @@ func (r *Registry) All() []*Entry {
 	return r.sortedEntries()
 }
 
+// MaxBrokenLevel returns the highest level that has been demonstrated (reached
+// state broken/hardened/reopened), or 0 if none. It drives the derived
+// mitigation mode: the further the academic clock has advanced, the harder the
+// recommended posture.
+func (r *Registry) MaxBrokenLevel() int {
+	max := 0
+	for _, e := range r.entries {
+		if e.Level > max && isBrokenOrAfter(e.State) {
+			max = e.Level
+		}
+	}
+	return max
+}
+
 // Submit records a submission against level and runs verify. On success it
 // advances open→claimed→verified→broken in one step and stamps VerifiedAt. On
 // failure the entry stays in its previous state and nothing is persisted. The
