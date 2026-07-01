@@ -11,6 +11,8 @@ qlabcoin-registry.json.tmp
 # Local append-only event chain (Phase 2)
 qlabcoin-chain.json
 qlabcoin-chain.json.tmp
+# Locally generated public dashboard (Phase 5); a committed snapshot lives in examples/
+qlabcoin-dashboard.html
 
 # Working design notes (kept locally, not part of the repo)
 Nuevo Documento de texto.txt

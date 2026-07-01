@@ -57,6 +57,9 @@ go run ./cmd/qlabcoin verify-chain           # check chain integrity + replay
 go run ./cmd/qlabcoin mitigation -list       # the A-F hardening ladder
 go run ./cmd/qlabcoin mitigation             # active posture derived from the clock
 go run ./cmd/qlabcoin mitigation -mode C -request '{"pubkey_exposed":true,"has_live_utxo":true}'
+go run ./cmd/qlabcoin distance               # Bitcoin threshold under multiple QEC assumptions
+go run ./cmd/qlabcoin dashboard              # text quantum clock derived from the chain
+go run ./cmd/qlabcoin dashboard -html        # self-contained public dashboard (qlabcoin-dashboard.html)
 go run ./cmd/qlabcoin bitcoin
 ```
 
@@ -66,6 +69,15 @@ Challenge state lives on an **append-only event chain** (default
 `open → claimed → verified → broken → hardened → reopened`; `submit` records a
 verified solution and `transition` records harden/reopen events. See
 `docs/CHAIN_FORMAT.md`.
+
+## Distance Profiles
+
+The Bitcoin threshold can be read against several QEC-overhead assumptions
+(`qlabcoin distance`): optimistic 25:1, moderate 100:1, conservative 1000:1
+physical-per-logical, plus an empirical profile that refuses any conversion.
+Profiles only re-price the threshold in hardware terms — the demonstrated
+distance percentage is identical across all of them, because only attack qubits
+recorded on the chain advance the clock. See `docs/DISTANCE_MODEL.md`.
 
 ## Research Cycle
 

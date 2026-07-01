@@ -110,7 +110,16 @@ Independent reproductions of an already-broken level are recorded separately as
 `reproduce` events on the chain (see `docs/CHAIN_FORMAT.md`); positive ones raise
 the level's derived `reproductions` counter.
 
-## 7. Non-Goals
+## 7. Distance Profiles
+
+The Bitcoin threshold is additionally reported under multiple QEC-overhead
+assumptions (see `docs/DISTANCE_MODEL.md`): optimistic (25 physical per
+logical), moderate (100), conservative (1000), and empirical (no conversion).
+Profiles translate the threshold into Q6100-processor and physical-qubit terms;
+they never advance the clock. The demonstrated distance percentage is defined
+solely as `100 * demonstrated_level / 2330` and is identical across profiles.
+
+## 8. Non-Goals
 
 - No real financial value.
 - No claim that physical qubits equal logical qubits.

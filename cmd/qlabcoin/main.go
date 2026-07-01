@@ -39,6 +39,10 @@ func main() {
 		verifyChain(os.Args[2:])
 	case "mitigation":
 		mitigation(os.Args[2:])
+	case "distance":
+		distance(os.Args[2:])
+	case "dashboard":
+		dashboard(os.Args[2:])
 	case "bitcoin":
 		bitcoin()
 	default:
@@ -63,6 +67,8 @@ Commands:
   qlabcoin history [-chain <path>]
   qlabcoin verify-chain [-chain <path>]
   qlabcoin mitigation [-list | -mode <A-F> -request <json> | -chain <path>]
+  qlabcoin distance [-level <n>] [-chain <path>]
+  qlabcoin dashboard [-html] [-out <file>] [-chain <path>]
   qlabcoin bitcoin
 
 States: open, claimed, verified, broken, hardened, reopened
@@ -541,6 +547,67 @@ func maxBrokenFromChain(chainPath string) int {
 		return 0
 	}
 	return reg.MaxBrokenLevel()
+}
+
+// distance reports the Bitcoin threshold translated under every QEC assumption
+// profile. The demonstrated level defaults to the chain's highest broken level;
+// -level explores a hypothetical clock position without touching any chain.
+func distance(args []string) {
+	fs := flag.NewFlagSet("distance", flag.ExitOnError)
+	levelFlag := fs.Int("level", -1, "hypothetical demonstrated level (default: derived from chain)")
+	chainPath := fs.String("chain", qlab.DefaultChainPath, "chain file path")
+	_ = fs.Parse(reorderFlags(args))
+	lvl := *levelFlag
+	if lvl < 0 {
+		chain := loadChain(*chainPath)
+		reg, err := qlab.DeriveRegistry(chain)
+		if err != nil {
+			fatal(err)
+		}
+		lvl = reg.MaxBrokenLevel()
+	}
+	printJSON(map[string]interface{}{
+		"demonstrated_level": lvl,
+		"bitcoin_threshold":  qlab.BitcoinLogicalThreshold,
+		"profiles":           qlab.DistanceReport(lvl),
+	})
+}
+
+// dashboard prints the quantum-clock snapshot derived from the chain. With
+// -html it writes a self-contained static page (default qlabcoin-dashboard.html,
+// or stdout with -out -) suitable for publishing as-is.
+func dashboard(args []string) {
+	fs := flag.NewFlagSet("dashboard", flag.ExitOnError)
+	htmlFlag := fs.Bool("html", false, "write a self-contained HTML dashboard instead of text")
+	out := fs.String("out", "", "output file for -html (default qlabcoin-dashboard.html; '-' for stdout)")
+	chainPath := fs.String("chain", qlab.DefaultChainPath, "chain file path")
+	_ = fs.Parse(reorderFlags(args))
+	chain := loadChain(*chainPath)
+	reg, err := qlab.DeriveRegistry(chain)
+	if err != nil {
+		fatal(err)
+	}
+	d := qlab.BuildDashboard(chain, reg, nowRFC3339())
+	if !*htmlFlag {
+		fmt.Print(d.RenderText())
+		return
+	}
+	html, err := d.RenderHTML()
+	if err != nil {
+		fatal(err)
+	}
+	if *out == "-" {
+		fmt.Print(html)
+		return
+	}
+	path := *out
+	if path == "" {
+		path = "qlabcoin-dashboard.html"
+	}
+	if err := os.WriteFile(path, []byte(html), 0644); err != nil {
+		fatal(err)
+	}
+	fmt.Println("wrote", path)
 }
 
 func bitcoin() {
