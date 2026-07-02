@@ -10,7 +10,7 @@ on:
   # Allow manual runs from the Actions tab.
   workflow_dispatch:
 
-# Permissions: write to the gh-pages branch (contents) only.
+# The GITHUB_TOKEN needs write access to push to the gh-pages branch.
 permissions:
   contents: write
 
@@ -34,18 +34,22 @@ jobs:
         run: ./bin/qlabcoin verify-chain -chain qlabcoin-canonical-chain.json
 
       - name: Regenerate dashboard
-        run: ./bin/qlabcoin dashboard -html -out index.html -chain qlabcoin-canonical-chain.json
+        run: ./bin/qlabcoin dashboard -html -out dashboard.html -chain qlabcoin-canonical-chain.json
 
-      # Publish: force-push index.html as the only file on gh-pages.
+      # Publish: create an orphan gh-pages branch with only index.html and
+      # force-push it. Authentication goes through actions/checkout's persisted
+      # remote (it embeds the GITHUB_TOKEN), so we push to that remote.
       - name: Publish to gh-pages
         run: |
           cd "$(mktemp -d)"
           git init -q
-          git config user.name "github-actions[bot]"
+          git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          cp "$GITHUB_WORKSPACE/index.html" .
+          cp "$GITHUB_WORKSPACE/dashboard.html" index.html
           git add index.html
           git commit -q -m "Publish dashboard from ${GITHUB_SHA::7}"
-          git push -q -f "https://${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:gh-pages
+          # Reuse the authenticated remote that actions/checkout created.
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push -q -f origin HEAD:gh-pages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
