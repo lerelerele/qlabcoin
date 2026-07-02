@@ -4,6 +4,22 @@
       "index": 0,
       "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
       "events": null
+    },
+    {
+      "index": 1,
+      "prev_hash": "91e2a70383636a6a574f1d55fea05077d06e8f4b0de9530d107eccfd510a6a82",
+      "events": [
+        {
+          "type": "register",
+          "level": 0,
+          "author": "lerelerele",
+          "identity": {
+            "author": "lerelerele",
+            "pubkey": "lVsImStNs460d48bexUY4jFlkTiVlzrikCWoNQVgR2k="
+          },
+          "timestamp": "2026-07-02T19:10:38Z"
+        }
+      ]
     }
   ]
 }
