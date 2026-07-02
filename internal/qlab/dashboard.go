@@ -35,6 +35,7 @@ type Dashboard struct {
 	DistancePercent    float64           `json:"distance_percent"`
 	Distances          []ProfileDistance `json:"distances"`
 	Demonstrations     []Demonstration   `json:"demonstrations,omitempty"`
+	RepoURL            string            `json:"repo_url,omitempty"`
 	Note               string            `json:"note"`
 }
 
@@ -86,6 +87,7 @@ func BuildDashboard(c *Chain, r *Registry, generatedAt string) Dashboard {
 		DistancePercent:    100 * float64(maxBroken) / float64(BitcoinLogicalThreshold),
 		Distances:          DistanceReport(maxBroken),
 		Demonstrations:     demos,
+		RepoURL:            "https://github.com/lerelerele/qlabcoin",
 		Note:               dashboardNote,
 	}
 	if maxBroken > 0 {
@@ -190,6 +192,10 @@ var dashboardTmpl = template.Must(template.New("dashboard").Parse(`<!DOCTYPE htm
   th{color:#9aa4b2;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;}
   .mode{display:inline-block;background:#1f6feb;color:#fff;border-radius:6px;padding:.05rem .5rem;}
   .note{color:#9aa4b2;font-size:.85rem;border-left:3px solid #1f6feb;padding-left:.8rem;margin-top:1.6rem;}
+  .participate{background:#161b22;border:1px solid #2d333b;border-radius:8px;padding:1rem;margin-top:1.6rem;font-size:.95rem;}
+  .participate a,.footer a{color:#58a6ff;}
+  .footer{color:#768390;font-size:.8rem;margin-top:1.6rem;text-align:center;}
+  a{color:#58a6ff;}
   p{color:#c9d1d9;font-size:.95rem;}
 </style>
 </head>
@@ -214,5 +220,7 @@ var dashboardTmpl = template.Must(template.New("dashboard").Parse(`<!DOCTYPE htm
 <tr><th>Level</th><th>Family</th><th>Demonstrated by</th></tr>
 {{range .Demonstrations}}<tr><td>{{.Level}}</td><td>{{.Family}}</td><td>{{.Author}}</td></tr>
 {{end}}</table>{{end}}
+{{if .OpenLevels}}<div class="participate">Want to break an open level? This is a public research clock — anyone can attempt it. See <a href="{{.RepoURL}}#contributing">how to participate</a> and <a href="{{.RepoURL}}/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>.</div>{{end}}
+<div class="footer">Source &amp; claims: <a href="{{.RepoURL}}">{{.RepoURL}}</a></div>
 </div></body></html>
 `))
