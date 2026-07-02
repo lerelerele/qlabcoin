@@ -2,28 +2,18 @@ package qlab
 
 import (
 	"encoding/json"
-	"path/filepath"
 	"testing"
 )
 
-func newTestRegistry(t *testing.T) *Registry {
-	t.Helper()
-	r := NewRegistry(filepath.Join(t.TempDir(), "registry.json"))
-	if err := r.Load(); err != nil {
-		t.Fatalf("Load: %v", err)
-	}
-	return r
-}
-
-func TestRegistryLoadMissingFileIsEmpty(t *testing.T) {
-	r := newTestRegistry(t)
+func TestNewRegistryIsEmpty(t *testing.T) {
+	r := NewRegistry()
 	if got := len(r.All()); got != 0 {
 		t.Fatalf("expected empty registry, got %d entries", got)
 	}
 }
 
 func TestRegistryEntryCreatedOpen(t *testing.T) {
-	r := newTestRegistry(t)
+	r := NewRegistry()
 	e, existed := r.Entry(5)
 	if existed {
 		t.Fatal("first Entry() should report not-existed")
@@ -40,64 +30,12 @@ func TestRegistryEntryCreatedOpen(t *testing.T) {
 }
 
 func TestRegistryEntryInvalidLevel(t *testing.T) {
-	r := newTestRegistry(t)
+	r := NewRegistry()
 	if e, _ := r.Entry(0); e != nil {
 		t.Fatal("Entry(0) should return nil")
 	}
 	if e, _ := r.Entry(-1); e != nil {
 		t.Fatal("Entry(-1) should return nil")
-	}
-}
-
-// TestSubmitSuccessAdvancesToBroken: a verified submission must collapse
-// open→broken in one step and stamp VerifiedAt.
-func TestSubmitSuccessAdvancesToBroken(t *testing.T) {
-	r := newTestRegistry(t)
-	s := Submission{Solution: "36", CircuitHash: "sha256:abc"}
-	err := r.Submit(5, s, func() bool { return true })
-	if err != nil {
-		t.Fatalf("Submit: %v", err)
-	}
-	e, _ := r.Entry(5)
-	if e.State != StateBroken {
-		t.Fatalf("state = %s, want broken", e.State)
-	}
-	if e.Submission == nil {
-		t.Fatal("submission not stored")
-	}
-	if e.Submission.VerifiedAt == "" {
-		t.Fatal("VerifiedAt not stamped")
-	}
-	if e.Submission.ChallengeID != e.ChallengeID {
-		t.Fatalf("submission challenge id %q != entry %q", e.Submission.ChallengeID, e.ChallengeID)
-	}
-}
-
-// TestSubmitFailureKeepsOpen: a failed verification must not mutate state.
-func TestSubmitFailureKeepsOpen(t *testing.T) {
-	r := newTestRegistry(t)
-	err := r.Submit(5, Submission{Solution: "wrong"}, func() bool { return false })
-	if err == nil {
-		t.Fatal("expected verification error")
-	}
-	e, _ := r.Entry(5)
-	if e.State != StateOpen {
-		t.Fatalf("state = %s, want open after failed verify", e.State)
-	}
-	if e.Submission != nil {
-		t.Fatal("submission must not be stored on failed verify")
-	}
-}
-
-// TestSubmitOnNonOpenRejected: once broken, a level must reject new submissions.
-func TestSubmitOnNonOpenRejected(t *testing.T) {
-	r := newTestRegistry(t)
-	if err := r.Submit(5, Submission{Solution: "36"}, func() bool { return true }); err != nil {
-		t.Fatalf("first submit: %v", err)
-	}
-	err := r.Submit(5, Submission{Solution: "36"}, func() bool { return true })
-	if err == nil {
-		t.Fatal("expected error submitting to a broken level")
 	}
 }
 
@@ -128,58 +66,25 @@ func TestValidTransition(t *testing.T) {
 	}
 }
 
-// TestReopenedAdvancesClock: reopening level N must open level N+1.
-func TestReopenedAdvancesClock(t *testing.T) {
-	r := newTestRegistry(t)
-	if err := r.Submit(5, Submission{Solution: "36"}, func() bool { return true }); err != nil {
-		t.Fatalf("submit: %v", err)
+// TestTransitionCollapsedThenReopenAdvancesClock drives a level open→broken
+// (the edge submit collapses) then broken→hardened→reopened, and checks that
+// reopening opens the next level.
+func TestTransitionReopenAdvancesClock(t *testing.T) {
+	r := NewRegistry()
+	for _, to := range []EntryState{StateBroken, StateHardened, StateReopened} {
+		if err := r.Transition(5, to); err != nil {
+			t.Fatalf("transition to %s: %v", to, err)
+		}
 	}
-	if err := r.Transition(5, StateHardened); err != nil {
-		t.Fatalf("transition to hardened: %v", err)
-	}
-	if err := r.Transition(5, StateReopened); err != nil {
-		t.Fatalf("transition to reopened: %v", err)
-	}
-	next, existed := r.Entry(6)
-	if next == nil {
-		t.Fatal("reopened did not open level 6")
-	}
-	if next.State != StateOpen {
-		t.Fatalf("level 6 state = %s, want open", next.State)
-	}
-	_ = existed
-}
-
-// TestSaveLoadRoundTrip: persisting and reloading preserves entries and states.
-func TestSaveLoadRoundTrip(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "registry.json")
-
-	r1 := NewRegistry(path)
-	_ = r1.Load()
-	if err := r1.Submit(5, Submission{Solution: "36", CircuitHash: "sha256:abc"}, func() bool { return true }); err != nil {
-		t.Fatalf("submit: %v", err)
-	}
-	if err := r1.Save(); err != nil {
-		t.Fatalf("save: %v", err)
-	}
-
-	r2 := NewRegistry(path)
-	if err := r2.Load(); err != nil {
-		t.Fatalf("reload: %v", err)
-	}
-	e, _ := r2.Entry(5)
-	if e.State != StateBroken {
-		t.Fatalf("after reload state = %s, want broken", e.State)
-	}
-	if e.Submission == nil || e.Submission.Solution != "36" {
-		t.Fatalf("submission not preserved: %+v", e.Submission)
+	next, _ := r.Entry(6)
+	if next == nil || next.State != StateOpen {
+		t.Fatalf("reopening level 5 did not open level 6 as open: %+v", next)
 	}
 }
 
 // TestTransitionInvalidEdgeRejected: a bad edge must error without mutating.
 func TestTransitionInvalidEdgeRejected(t *testing.T) {
-	r := newTestRegistry(t)
+	r := NewRegistry()
 	r.Entry(5)                            // open
 	err := r.Transition(5, StateHardened) // open -> hardened skipped
 	if err == nil {

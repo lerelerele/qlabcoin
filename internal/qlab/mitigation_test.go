@@ -94,7 +94,7 @@ func TestDeriveMitigationModeByBand(t *testing.T) {
 		{BitcoinLogicalThreshold, ModeF},
 	}
 	for _, c := range cases {
-		r := NewRegistry("")
+		r := NewRegistry()
 		if c.maxBroken > 0 {
 			e, _ := r.Entry(c.maxBroken)
 			e.State = StateBroken
@@ -108,7 +108,7 @@ func TestDeriveMitigationModeByBand(t *testing.T) {
 
 // TestMaxBrokenLevelSkipsOpenLevels: only broken/hardened/reopened count.
 func TestMaxBrokenLevelSkipsOpenLevels(t *testing.T) {
-	r := NewRegistry("")
+	r := NewRegistry()
 	e3, _ := r.Entry(3)
 	e3.State = StateOpen
 	e5, _ := r.Entry(5)

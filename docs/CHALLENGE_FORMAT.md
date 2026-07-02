@@ -16,8 +16,15 @@ go run ./cmd/qlabcoin challenge 1
   "family": "quantum-primitive",
   "status": "open",
   "target": {
-    "description": "Demonstrate useful logical attack qubits in a repeatable quantum subroutine.",
+    "name": "plus-state",
+    "circuit": "H q0",
     "type": "quantum-primitive",
+    "expected_outcomes": ["0", "1"],
+    "min_shots": 100,
+    "tolerance": 0.1,
+    "max_noise": 0.05,
+    "description": "Demonstrate useful logical attack qubits in a repeatable quantum subroutine.",
+    "hint": "run \"H q0\" for at least 100 shots and submit the outcome counts; ...",
     "win_condition": "submit measured output, circuit hash, and reproducible verification notes"
   },
   "verification": {
@@ -28,6 +35,10 @@ go run ./cmd/qlabcoin challenge 1
   "mitigation_after_break": "publish result; open next level"
 }
 ```
+
+Each family embeds its own deterministic target parameters: `expected_outcomes`
+for quantum-primitive levels, `modulus`/`base` for toy-order-finding, and the
+curve `p`/`a`/`b`/`gx`/`gy`/`qx`/`qy` (plus `certified_solvable`) for toy-ecdlp.
 
 ## Families
 
@@ -109,15 +120,17 @@ For level 5 that order is 36. Classical verification checks that the claim holds
 
 ## Submission and state
 
-`submit` verifies the solution classically and, on success, advances the level
-`open → claimed → verified → broken` in one step:
+`submit` verifies the solution classically and, on success, appends a `submit`
+event to the chain, advancing the level `open → claimed → verified → broken` in
+one step:
 
 ```bash
 go run ./cmd/qlabcoin submit 5 -solution 36 -circuit sha256:example
 ```
 
-State is persisted in a local JSON registry (default `qlabcoin-registry.json`).
-The remaining manual steps use `transition`:
+State is **not** stored separately: it is derived by replaying the append-only
+event chain (default `qlabcoin-chain.json`; see `docs/CHAIN_FORMAT.md`). The
+remaining manual steps append their own events via `transition`:
 
 ```bash
 go run ./cmd/qlabcoin transition 5 hardened
@@ -128,11 +141,15 @@ See `examples/submission-005.json` for a full winning entry.
 
 ## Solver Proof
 
+A submission records the solution plus the reproducibility metadata. For an
+ECDLP level the solution is a scalar `d` with `d·G == Q` (recovered by the
+solver — it is not derivable from the challenge source):
+
 ```json
 {
   "challenge_id": "qlab-L019-89834f043f",
   "claimed_logical_attack_qubits": 19,
-  "solution": "1",
+  "solution": "<d such that d·G == Q>",
   "circuit_hash": "sha256:...",
   "backend": {
     "hardware": "example university lab",
@@ -143,4 +160,5 @@ See `examples/submission-005.json` for a full winning entry.
 }
 ```
 
-Qlabcoin must verify the solution classically before advancing the clock.
+Qlabcoin must verify the solution classically before advancing the clock, both
+at submit time and on every chain replay.

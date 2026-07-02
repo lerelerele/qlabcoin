@@ -5,9 +5,6 @@ dist/
 coverage.out
 .DS_Store
 Thumbs.db
-# Local challenge-state registry (created by submit/transition/state)
-qlabcoin-registry.json
-qlabcoin-registry.json.tmp
 # Local append-only event chain (Phase 2)
 qlabcoin-chain.json
 qlabcoin-chain.json.tmp

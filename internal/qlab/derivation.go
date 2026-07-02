@@ -13,7 +13,7 @@ import (
 // that violates a valid transition makes the chain corrupt and returns an error
 // pinpointing the offending block/level.
 func DeriveRegistry(c *Chain) (*Registry, error) {
-	r := NewRegistry("")
+	r := NewRegistry()
 	blocks := c.Blocks()
 	for bi, b := range blocks {
 		if bi == 0 {

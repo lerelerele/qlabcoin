@@ -1,17 +1,9 @@
 package qlab
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
-	"os"
 	"sort"
-	"time"
 )
-
-// DefaultRegistryPath is the local file used to persist challenge state when no
-// explicit path is given. It is intentionally a local, non-committed file.
-const DefaultRegistryPath = "qlabcoin-registry.json"
 
 // Challenge lifecycle states (see docs/QLABCOIN_SPEC.md §5):
 //
@@ -61,60 +53,17 @@ type Entry struct {
 	Reproductions int         `json:"reproductions,omitempty"` // independent corroborations (derived from chain)
 }
 
-// registryFile is the on-disk JSON layout.
-type registryFile struct {
-	Entries []*Entry `json:"entries"`
-}
-
-// Registry persists challenge state in a single JSON file.
+// Registry is the in-memory view of challenge state. It is never persisted on
+// its own: the append-only event chain is the single source of truth, and a
+// Registry is always produced by replaying that chain (see DeriveRegistry).
 type Registry struct {
-	path    string
 	entries map[int]*Entry
 }
 
-// NewRegistry returns a registry backed by path. The file is not touched until
-// Load or a mutating call is made.
-func NewRegistry(path string) *Registry {
-	if path == "" {
-		path = DefaultRegistryPath
-	}
-	return &Registry{path: path, entries: make(map[int]*Entry)}
-}
-
-// Load reads the registry file. A missing file is not an error: the registry
-// starts empty and is created on the next Save.
-func (r *Registry) Load() error {
-	b, err := os.ReadFile(r.path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil // fresh registry
-		}
-		return err
-	}
-	var f registryFile
-	if err := json.Unmarshal(b, &f); err != nil {
-		return fmt.Errorf("parse registry %s: %w", r.path, err)
-	}
-	r.entries = make(map[int]*Entry, len(f.Entries))
-	for _, e := range f.Entries {
-		r.entries[e.Level] = e
-	}
-	return nil
-}
-
-// Save writes the registry atomically: marshal, write to a temp file, then
-// rename over the target. Entries are sorted by level for stable diffs.
-func (r *Registry) Save() error {
-	out := registryFile{Entries: r.sortedEntries()}
-	b, err := json.MarshalIndent(out, "", "  ")
-	if err != nil {
-		return err
-	}
-	tmp := r.path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0644); err != nil {
-		return err
-	}
-	return os.Rename(tmp, r.path)
+// NewRegistry returns an empty in-memory registry, ready to have chain events
+// applied to it.
+func NewRegistry() *Registry {
+	return &Registry{entries: make(map[int]*Entry)}
 }
 
 // Entry returns the registry entry for level. If none exists and the level is a
@@ -156,31 +105,9 @@ func (r *Registry) MaxBrokenLevel() int {
 	return max
 }
 
-// Submit records a submission against level and runs verify. On success it
-// advances open→claimed→verified→broken in one step and stamps VerifiedAt. On
-// failure the entry stays in its previous state and nothing is persisted. The
-// caller is responsible for calling Save.
-func (r *Registry) Submit(level int, s Submission, verify func() bool) error {
-	e, _ := r.Entry(level)
-	if e.State != StateOpen {
-		return fmt.Errorf("level %d is %s, not open (cannot submit)", level, e.State)
-	}
-	if !verify() {
-		return fmt.Errorf("classical verification failed for level %d", level)
-	}
-	s.ChallengeID = e.ChallengeID
-	s.Level = level
-	if s.ClaimedLogicalAttackQubits == 0 {
-		s.ClaimedLogicalAttackQubits = level
-	}
-	s.VerifiedAt = time.Now().UTC().Format(time.RFC3339)
-	applySubmit(e, s)
-	return nil
-}
-
 // applySubmit stamps a verified submission onto an entry and moves it to broken.
-// Shared by the live Submit path and the chain re-derivation path. It assumes
-// the caller has already verified the solution.
+// Called from the chain re-derivation path (DeriveRegistry); it assumes the
+// caller has already verified the solution.
 func applySubmit(e *Entry, s Submission) {
 	e.Submission = &s
 	e.State = StateBroken // open → claimed → verified → broken in one accepted step
@@ -188,7 +115,8 @@ func applySubmit(e *Entry, s Submission) {
 
 // Transition moves level to the requested state after validating the edge. The
 // special case StateReopened also opens level+1 in StateOpen, advancing the
-// research clock. The caller is responsible for calling Save.
+// research clock. It mutates the in-memory registry only; the caller records the
+// corresponding event on the chain.
 func (r *Registry) Transition(level int, to EntryState) error {
 	e, _ := r.Entry(level)
 	if !ValidTransition(e.State, to) {

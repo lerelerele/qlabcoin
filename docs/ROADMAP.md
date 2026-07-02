@@ -12,9 +12,9 @@
 - Deterministic toy order-finding groups for levels 4-18.
 - Classical verification (multiplicative order, strict minimality).
 - Solver submission via `submit` (verifies and advances to broken).
-- Challenge state transitions via `transition`; local JSON registry via `state`.
-- Remaining: classical verification for quantum-primitive (1-3) and toy-ecdlp
-  (19+) families.
+- Challenge state transitions via `transition`; derived state via `state`.
+- Classical verification for the quantum-primitive (1-3) and toy-ecdlp (19+)
+  families was completed later (see "All level families" below).
 
 ## Phase 2: Local Chain (done)
 
@@ -45,14 +45,26 @@
 - CLI: mitigation (-list / -mode / -request); state now reports the derived mode.
 - Remaining: signed author identity, multi-party spend policies.
 
-## Phase 5: Bitcoin Distance Model
+## Phase 5: Bitcoin Distance Model (done)
 
 - Reference secp256k1 threshold.
-- Multiple hardware/error-correction assumptions.
-- Public dashboard.
+- Multiple hardware/error-correction (QEC) assumption profiles.
+- Public dashboard (text + self-contained HTML). See docs/DISTANCE_MODEL.md.
 
-## Phase 6: External Review
+## All Level Families (done)
 
-- University challenge submissions.
-- Reproducibility review.
-- Published results.
+- Quantum-primitive (1-3): deterministic circuits verified by measured-outcome
+  distribution.
+- Toy-ecdlp (19+): deterministic curves with a hash-to-point Q (no known
+  discrete log); small fields use prime-order curves and are certified solvable.
+  Level 2330 is a concrete 256-bit reference marker. See docs/CHALLENGE_FORMAT.md.
+- Chain replay re-verifies every recorded submission per family.
+
+## Publication + External Review (in progress)
+
+- LICENSE, CONTRIBUTING.md (submission-by-PR against the canonical chain), and
+  CI (`.github/workflows/ci.yml`) are in place; the canonical chain
+  (`qlabcoin-canonical-chain.json`) starts at genesis.
+- Remaining: create the public remote and push; host the dashboard; accept
+  university challenge submissions and reproducibility reviews as PRs.
+- Open design question: signed author identity (see docs/NEXT_STEPS.md).
