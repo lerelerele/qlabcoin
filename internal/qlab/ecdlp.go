@@ -11,31 +11,42 @@ import (
 // bitcoin-reference line).
 //
 // Each level gets a deterministic tiny elliptic curve y² = x³ + ax + b over a
-// prime field F_p, a base point G, and a public point Q = dG. The win condition
-// is recovering any scalar d' with d'G == Q (every representative of d modulo
-// ord(G) is a valid discrete log). Verification is classical and cheap
+// prime field F_p, a base point G, and a public point Q. The win condition is
+// recovering any scalar d with d·G == Q. Verification is classical and cheap
 // (double-and-add), even at 256 bits.
 //
-// Honesty notes:
-//   - Parameters are derived deterministically from the level so the challenge
-//     is reproducible without coordination. That means d itself can be
-//     re-derived from this source code (see ECDLPReferenceSolution) — exactly
-//     like SolveOrder for the order-finding band. The value of a submission is
-//     the audited protocol (circuit report, reproductions), not secrecy.
-//   - The level-2330 curve is an arbitrary educational 256-bit curve, NOT
-//     secp256k1 and NOT anything holding value. It exists so the reference
-//     line is a concrete, verifiable object rather than a slogan.
+// Nobody-knows-d design:
+//   - Q is NOT built as d·G for a project-chosen d. It is derived by hashing to
+//     a point on the curve (try-and-increment on x). No discrete log is used in
+//     generation, so no d is stored, and none is recoverable from this source.
+//     Reading the code does not reveal a solution — unlike SolveOrder for the
+//     order-finding band. Recovering d genuinely requires solving the ECDLP.
+//   - For fields small enough to count points (<= maxCertifiedFieldBits), the
+//     curve is chosen to have PRIME group order, so it is cyclic and every
+//     affine point — including a hash-derived Q — lies in <G>. The challenge is
+//     therefore certified solvable. The exact d is unknown until someone
+//     computes it (classically or otherwise).
+//   - For larger fields, point counting is infeasible here (Schoof is not
+//     implemented), so the group order and thus whether Q lies in <G> are
+//     unknown. These levels are honest REFERENCE MARKERS: a concrete curve and
+//     a real hash-derived point, but solvability is not certified and no
+//     solution is known to exist. The level-2330 curve is such a marker — an
+//     arbitrary educational 256-bit curve, NOT secp256k1 and NOT holding value.
 
 // minECDLPFieldBits is the smallest usable field size. The reference resource
 // model "fits" a 1-bit curve at level 19, but no meaningful short-Weierstrass
-// curve exists below a 3-bit field, so the smallest levels share the smallest
-// lab curve size.
+// curve exists below a 3-bit field, so the smallest levels share it.
 const minECDLPFieldBits = 3
 
+// maxCertifiedFieldBits is the largest field for which we count points (O(p))
+// and require a prime group order, certifying the challenge is solvable. Beyond
+// it, levels are reference markers. It is a deliberate implementation bound
+// (fast, int64-safe generation), raisable later with a faster order algorithm.
+const maxCertifiedFieldBits = 16
+
 // maxECDLPSolutionSlack bounds how much larger than the field a claimed scalar
-// may be (in bits). Any d' ≡ d (mod ord(G)) is a valid discrete log, so small
-// over-representatives are fine; absurdly long scalars are rejected before the
-// (linear in bit-length) scalar multiplication runs.
+// may be (in bits), so absurdly long inputs are rejected before the scalar
+// multiplication (linear in bit-length) runs. Any d within the group order fits.
 const maxECDLPSolutionSlack = 64
 
 // ECDLPChallenge is the JSON-facing description of a level's curve target.
@@ -45,6 +56,7 @@ type ECDLPChallenge struct {
 	Family             string `json:"family"`
 	ReferenceCurveBits int    `json:"reference_curve_bits"` // what the resource model fits at this level
 	FieldBits          int    `json:"field_bits"`           // actual bit length of P (>= minECDLPFieldBits)
+	Certified          bool   `json:"certified_solvable"`   // true => prime order, Q provably in <G>
 	P                  string `json:"p"`
 	A                  string `json:"a"`
 	B                  string `json:"b"`
@@ -52,6 +64,7 @@ type ECDLPChallenge struct {
 	Gy                 string `json:"gy"`
 	Qx                 string `json:"qx"`
 	Qy                 string `json:"qy"`
+	Order              string `json:"order,omitempty"` // group order, published only for certified levels
 	Hint               string `json:"hint"`
 }
 
@@ -67,11 +80,13 @@ type ecPoint struct {
 	inf  bool
 }
 
-// ecdlpParams is the internal (big.Int) form of a level's challenge.
+// ecdlpParams is the internal (big.Int) form of a level's challenge. No d is
+// stored: the challenge is generated without ever computing a discrete log.
 type ecdlpParams struct {
-	p, a, b *big.Int
-	g, q    ecPoint
-	d       *big.Int // reference solution; derivable by design
+	p, a, b   *big.Int
+	g, q      ecPoint
+	certified bool
+	order     *big.Int // group order for certified levels; nil otherwise
 }
 
 // ECDLPChallengeForLevel returns the deterministic curve challenge for level.
@@ -85,11 +100,12 @@ func ECDLPChallengeForLevel(level int) ECDLPChallenge {
 	}
 	prm := ecdlpParamsForLevel(level)
 	spec := LevelSpec(level)
-	return ECDLPChallenge{
+	c := ECDLPChallenge{
 		Level:              level,
 		Family:             spec.Family,
 		ReferenceCurveBits: spec.EstimatedCurveBits,
 		FieldBits:          prm.p.BitLen(),
+		Certified:          prm.certified,
 		P:                  prm.p.String(),
 		A:                  prm.a.String(),
 		B:                  prm.b.String(),
@@ -97,12 +113,19 @@ func ECDLPChallengeForLevel(level int) ECDLPChallenge {
 		Gy:                 prm.g.y.String(),
 		Qx:                 prm.q.x.String(),
 		Qy:                 prm.q.y.String(),
-		Hint: fmt.Sprintf("recover d with Q = dG on y² = x³ + %sx + %s over F_%s (any d with dG = Q verifies)",
-			prm.a.String(), prm.b.String(), prm.p.String()),
 	}
+	if prm.certified {
+		c.Order = prm.order.String()
+		c.Hint = fmt.Sprintf("recover d with Q = dG on y² = x³ + %sx + %s over F_%s (prime-order curve, order %s: a solution is guaranteed to exist)",
+			prm.a.String(), prm.b.String(), prm.p.String(), prm.order.String())
+	} else {
+		c.Hint = fmt.Sprintf("reference marker: Q is a hash-derived point on y² = x³ + %sx + %s over F_%s; the group order is beyond this build's point-counting horizon, so no solution is known to exist",
+			prm.a.String(), prm.b.String(), prm.p.String())
+	}
+	return c
 }
 
-// VerifyECDLP checks a claimed discrete log classically. nil means d'G == Q on
+// VerifyECDLP checks a claimed discrete log classically. nil means d·G == Q on
 // the level's deterministic curve; a non-nil error explains the rejection.
 func VerifyECDLP(level int, solution string) error {
 	if !IsECDLPLevel(level) {
@@ -126,33 +149,70 @@ func VerifyECDLP(level int, solution string) error {
 	return nil
 }
 
-// ECDLPReferenceSolution returns the scalar used to build the level's public
-// point. It is derivable by design (deterministic challenge); used by tests and
-// as a reference, never required from a solver, who may submit any congruent d.
-// Returns "" for out-of-band levels.
-func ECDLPReferenceSolution(level int) string {
-	if !IsECDLPLevel(level) {
-		return ""
-	}
-	return ecdlpParamsForLevel(level).d.String()
-}
-
-// ecdlpParamsForLevel derives the deterministic curve for a level: the smallest
-// prime of the target bit length, hash-derived (a, b) rejected until the curve
-// is nonsingular and has a base point of order > 2, and Q = dG with d hashed
-// into [1, p-1] (bumped once if Q would be the identity).
+// ecdlpParamsForLevel derives the deterministic curve for a level. Small fields
+// get a certified prime-order curve; larger ones get a reference marker. Both
+// take Q from a hash-to-point, so neither computes or stores a discrete log.
 func ecdlpParamsForLevel(level int) ecdlpParams {
 	bits := MaxCurveBitsForLogicalQubits(level)
 	if bits < minECDLPFieldBits {
 		bits = minECDLPFieldBits
 	}
+	if bits <= maxCertifiedFieldBits {
+		if prm, ok := buildCertifiedCurve(level, bits); ok {
+			return prm
+		}
+	}
+	if prm, ok := buildReferenceCurve(level, bits); ok {
+		return prm
+	}
+	// Unreachable in practice: nonsingular curves with points are abundant.
+	panic(fmt.Sprintf("qlabcoin: could not derive an ECDLP challenge for level %d", level))
+}
+
+// buildCertifiedCurve finds a prime-order curve of the target size and a
+// hash-derived non-trivial Q on it. Prime order makes the group cyclic, so Q is
+// guaranteed to be a multiple of G (the challenge is solvable) without anyone
+// knowing which multiple.
+func buildCertifiedCurve(level, bits int) (ecdlpParams, bool) {
 	one := big.NewInt(1)
 	p := nextPrimeBig(new(big.Int).Lsh(one, uint(bits-1)))
-	for seed := 0; seed < 256; seed++ {
-		a := hashToBig("a", level, seed)
-		a.Mod(a, p)
-		b := hashToBig("b", level, seed)
-		b.Mod(b, p)
+	for bump := 0; bump < 8; bump++ {
+		for seed := 0; seed < 512; seed++ {
+			a := new(big.Int).Mod(hashToBig("a", level, seed), p)
+			b := new(big.Int).Mod(hashToBig("b", level, seed), p)
+			if isSingular(a, b, p) {
+				continue
+			}
+			ord := curveOrderSmall(a.Int64(), b.Int64(), p.Int64())
+			if !isPrimeInt64(ord) {
+				continue
+			}
+			g, ok := findBasePoint(a, b, p)
+			if !ok {
+				continue
+			}
+			for qs := 0; qs < 512; qs++ {
+				q, ok := hashToPoint("q", level, seed*1000+qs, a, b, p)
+				if !ok || q.inf || ecEqual(q, g) {
+					continue // skip failures and the trivial d=1 case
+				}
+				return ecdlpParams{p: p, a: a, b: b, g: g, q: q, certified: true, order: big.NewInt(ord)}, true
+			}
+		}
+		p = nextPrimeBig(new(big.Int).Add(p, one))
+	}
+	return ecdlpParams{}, false
+}
+
+// buildReferenceCurve finds any nonsingular curve of the target size with a base
+// point and a hash-derived Q. The group order is not computed, so solvability is
+// not certified: this is a reference marker, not a live challenge.
+func buildReferenceCurve(level, bits int) (ecdlpParams, bool) {
+	one := big.NewInt(1)
+	p := nextPrimeBig(new(big.Int).Lsh(one, uint(bits-1)))
+	for seed := 0; seed < 1024; seed++ {
+		a := new(big.Int).Mod(hashToBig("a", level, seed), p)
+		b := new(big.Int).Mod(hashToBig("b", level, seed), p)
 		if isSingular(a, b, p) {
 			continue
 		}
@@ -160,26 +220,94 @@ func ecdlpParamsForLevel(level int) ecdlpParams {
 		if !ok {
 			continue
 		}
-		pm1 := new(big.Int).Sub(p, one)
-		d := hashToBig("d", level, seed)
-		d.Mod(d, pm1)
-		d.Add(d, one) // 1 <= d <= p-1
-		q := ecScalarMul(d, g, a, p)
-		// Skip degenerate publics: the identity (no affine Q to publish) and
-		// Q == G (visibly d ≡ 1, no challenge at all). ord(G) >= 3 because
-		// G is affine with y != 0, so among any three consecutive scalars at
-		// most one hits each degenerate case.
-		for tries := 0; (q.inf || ecEqual(q, g)) && tries < 4; tries++ {
-			d.Add(d, one)
-			q = ecScalarMul(d, g, a, p)
+		q, ok := hashToPoint("q", level, seed, a, b, p)
+		if !ok || ecEqual(q, g) {
+			continue
 		}
-		if q.inf || ecEqual(q, g) {
-			continue // pathological seed; try the next one
-		}
-		return ecdlpParams{p: p, a: a, b: b, g: g, q: q, d: d}
+		return ecdlpParams{p: p, a: a, b: b, g: g, q: q, certified: false}, true
 	}
-	// Unreachable in practice: nonsingular curves with points are abundant.
-	panic(fmt.Sprintf("qlabcoin: could not derive an ECDLP challenge for level %d", level))
+	return ecdlpParams{}, false
+}
+
+// hashToPoint derives a point on the curve by try-and-increment: hash to a
+// candidate x, take y = sqrt(x³ + ax + b) when it exists, choosing the smaller
+// root for determinism. No discrete log is involved. y=0 (2-torsion) is skipped.
+func hashToPoint(label string, level, seed int, a, b, p *big.Int) (ecPoint, bool) {
+	for ctr := 0; ctr < 8192; ctr++ {
+		x := new(big.Int).Mod(hashToBig(fmt.Sprintf("%s:x:%d", label, ctr), level, seed), p)
+		rhs := ecRHS(x, a, b, p)
+		y := new(big.Int).ModSqrt(rhs, p)
+		if y == nil || y.Sign() == 0 {
+			continue
+		}
+		if yneg := new(big.Int).Sub(p, y); yneg.Cmp(y) < 0 {
+			y = yneg
+		}
+		return ecPoint{x: x, y: y}, true
+	}
+	return ecPoint{}, false
+}
+
+// ecRHS returns x³ + ax + b mod p.
+func ecRHS(x, a, b, p *big.Int) *big.Int {
+	rhs := new(big.Int).Exp(x, big.NewInt(3), p)
+	ax := new(big.Int).Mul(a, x)
+	rhs.Add(rhs, ax)
+	rhs.Add(rhs, b)
+	rhs.Mod(rhs, p)
+	return rhs
+}
+
+// curveOrderSmall returns #E(F_p) = p + 1 + Σ_x legendre(x³+ax+b) for a small
+// prime p (< 2^maxCertifiedFieldBits), using int64 arithmetic. Only called from
+// the certified path, where overflow is impossible for the bounded p.
+func curveOrderSmall(a, b, p int64) int64 {
+	order := int64(1) // the point at infinity
+	for x := int64(0); x < p; x++ {
+		fx := (((x*x%p)*x)%p + (a%p)*x%p + b) % p
+		fx = ((fx % p) + p) % p
+		order += 1 + legendreInt64(fx, p)
+	}
+	return order
+}
+
+// legendreInt64 returns the Legendre symbol (n/p) as -1, 0, or 1 for odd prime p.
+func legendreInt64(n, p int64) int64 {
+	n = ((n % p) + p) % p
+	if n == 0 {
+		return 0
+	}
+	if modPowInt64(n, (p-1)/2, p) == 1 {
+		return 1
+	}
+	return -1
+}
+
+// modPowInt64 computes base^exp mod m for m*m within int64 range (m < 2^31).
+func modPowInt64(base, exp, m int64) int64 {
+	result := int64(1)
+	base %= m
+	for exp > 0 {
+		if exp&1 == 1 {
+			result = result * base % m
+		}
+		exp >>= 1
+		base = base * base % m
+	}
+	return result
+}
+
+// isPrimeInt64 tests small positive integers by trial division.
+func isPrimeInt64(n int64) bool {
+	if n < 2 {
+		return false
+	}
+	for d := int64(2); d*d <= n; d++ {
+		if n%d == 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // isSingular reports whether y² = x³ + ax + b is singular over F_p
@@ -204,11 +332,7 @@ func findBasePoint(a, b, p *big.Int) (ecPoint, bool) {
 	}
 	for xi := int64(0); xi < limit; xi++ {
 		x := big.NewInt(xi)
-		rhs := new(big.Int).Exp(x, big.NewInt(3), p)
-		ax := new(big.Int).Mul(a, x)
-		rhs.Add(rhs, ax)
-		rhs.Add(rhs, b)
-		rhs.Mod(rhs, p)
+		rhs := ecRHS(x, a, b, p)
 		y := new(big.Int).ModSqrt(rhs, p)
 		if y == nil || y.Sign() == 0 {
 			continue
@@ -293,12 +417,7 @@ func isOnCurve(pt ecPoint, a, b, p *big.Int) bool {
 		return true
 	}
 	lhs := new(big.Int).Exp(pt.y, big.NewInt(2), p)
-	rhs := new(big.Int).Exp(pt.x, big.NewInt(3), p)
-	ax := new(big.Int).Mul(a, pt.x)
-	rhs.Add(rhs, ax)
-	rhs.Add(rhs, b)
-	rhs.Mod(rhs, p)
-	return lhs.Cmp(rhs) == 0
+	return lhs.Cmp(ecRHS(pt.x, a, b, p)) == 0
 }
 
 // nextPrimeBig returns the smallest prime >= n. ProbablyPrime is deterministic

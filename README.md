@@ -36,10 +36,12 @@ Level 1: one useful logical qubit in a verifiable circuit (plus-state distributi
 Level 2: two useful logical qubits with entanglement evidence (Bell-pair distribution).
 Level 3: three useful logical qubits in a repeatable quantum subroutine (GHZ-3).
 Level 4+: toy order-finding challenges over tiny prime moduli.
-Level 19+: tiny ECDLP challenges on deterministic educational curves.
+Level 19+: tiny ECDLP challenges on deterministic educational curves; Q is a
+           hash-derived point with no known discrete log (prime-order curves are
+           certified solvable).
 Level 2330: approximate Bitcoin-like logical-qubit threshold, realized as a
-            256-bit educational-curve challenge — not secp256k1, not a claim
-            of practical breakability by itself.
+            256-bit hash-to-point reference marker — not secp256k1, not a claim
+            of practical breakability, and not certified solvable.
 ```
 
 All levels are live: every family has a deterministic target and a classical
@@ -111,6 +113,15 @@ Phase D: migration window after exposure.
 Phase E: hybrid ECC + hash-based signatures.
 Phase F: post-quantum signatures such as ML-DSA or SLH-DSA.
 ```
+
+## Contributing
+
+Qlabcoin is a public research clock: contributions are claims recorded on the
+canonical append-only chain (`qlabcoin-canonical-chain.json`) via pull request,
+validated by CI (`go test` + `verify-chain`, which re-runs every recorded
+solution through its classical verifier). There is no token and no financial
+reward — what you earn is a public, auditable, timestamped record of a
+demonstration. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Source Assumptions
 

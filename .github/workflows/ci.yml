@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build
+        run: go build -o bin/qlabcoin ./cmd/qlabcoin
+
+      # The canonical chain is the source of truth. Every PR must leave it
+      # structurally intact (hash links) and semantically valid: replay
+      # re-runs each recorded submission through its family's classical
+      # verifier, so an unverifiable solution fails the build.
+      - name: Verify canonical chain
+        run: ./bin/qlabcoin verify-chain -chain qlabcoin-canonical-chain.json

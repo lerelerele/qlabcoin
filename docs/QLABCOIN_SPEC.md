@@ -61,11 +61,14 @@ Levels 4-18:
 
 Levels 19+:
   Tiny ECDLP challenges on deterministic educational curves (3-bit field
-  floor). Verified classically: any d with dG = Q.
+  floor). Q is a hash-derived point with no known discrete log; small fields
+  use prime-order curves so the challenge is certified solvable. Verified
+  classically: any d with dG = Q.
 
 Level 2330:
   Approximate secp256k1 logical-qubit reference line, realized as a concrete
-  256-bit educational-curve challenge (not secp256k1).
+  256-bit hash-to-point reference marker (not secp256k1; solvability not
+  certified — its group order is beyond this build's point-counting horizon).
 ```
 
 All four families have classical verifiers; `submit` accepts any level, and

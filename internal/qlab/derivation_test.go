@@ -1,9 +1,6 @@
 package qlab
 
-import (
-	"math/big"
-	"testing"
-)
+import "testing"
 
 func TestDeriveRegistryGenesisOnlyIsEmpty(t *testing.T) {
 	c := newTestChain(t) // genesis only
@@ -118,15 +115,18 @@ func TestDeriveRegistryPrimitiveReplay(t *testing.T) {
 }
 
 // TestDeriveRegistryECDLPReplay: an ECDLP submission replays only if its
-// recorded scalar still satisfies d·G == Q.
+// recorded scalar still satisfies d·G == Q. The valid solution is found by
+// brute force (no reference solution exists in the source anymore).
 func TestDeriveRegistryECDLPReplay(t *testing.T) {
 	level := FirstECDLPLevel
-	good := newTestChain(t)
-	sub := Submission{
-		Solution:    ECDLPReferenceSolution(level),
-		CircuitHash: "sha256:abc",
-		VerifiedAt:  "t",
+	prm := ecdlpParamsForLevel(level)
+	sol, ok := bruteForceECDLP(prm, prm.order.Int64())
+	if !ok {
+		t.Fatalf("could not brute-force a discrete log for level %d", level)
 	}
+
+	good := newTestChain(t)
+	sub := Submission{Solution: sol, CircuitHash: "sha256:abc", VerifiedAt: "t"}
 	_, _ = good.Append(Event{Type: EventSubmit, Level: level, Submission: &sub, Timestamp: "t"})
 	r, err := DeriveRegistry(good)
 	if err != nil {
@@ -136,13 +136,8 @@ func TestDeriveRegistryECDLPReplay(t *testing.T) {
 		t.Fatalf("level %d state = %s, want broken", level, e.State)
 	}
 
-	// d+1 provably fails: (d+1)G = Q+G != Q because G is not the identity.
-	ref, ok := new(big.Int).SetString(ECDLPReferenceSolution(level), 10)
-	if !ok {
-		t.Fatal("reference solution is not decimal")
-	}
 	bad := newTestChain(t)
-	badSub := Submission{Solution: ref.Add(ref, big.NewInt(1)).String(), CircuitHash: "sha256:abc", VerifiedAt: "t"}
+	badSub := Submission{Solution: "0", CircuitHash: "sha256:abc", VerifiedAt: "t"} // 0·G = identity != Q
 	_, _ = bad.Append(Event{Type: EventSubmit, Level: level, Submission: &badSub, Timestamp: "t"})
 	if _, err := DeriveRegistry(bad); err == nil {
 		t.Fatal("bogus ECDLP scalar replayed without error")

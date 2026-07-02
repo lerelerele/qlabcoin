@@ -133,6 +133,7 @@ func challenge(args []string) {
 	case qlab.IsECDLPLevel(n):
 		ec := qlab.ECDLPChallengeForLevel(n)
 		c.Target["field_bits"] = ec.FieldBits
+		c.Target["certified_solvable"] = ec.Certified
 		c.Target["p"] = ec.P
 		c.Target["a"] = ec.A
 		c.Target["b"] = ec.B
@@ -140,6 +141,9 @@ func challenge(args []string) {
 		c.Target["gy"] = ec.Gy
 		c.Target["qx"] = ec.Qx
 		c.Target["qy"] = ec.Qy
+		if ec.Order != "" {
+			c.Target["order"] = ec.Order
+		}
 		c.Target["hint"] = ec.Hint
 	}
 	printJSON(c)
@@ -232,18 +236,19 @@ func verify(args []string) {
 		ec := qlab.ECDLPChallengeForLevel(n)
 		verr := qlab.VerifyECDLP(n, *solution)
 		out := map[string]interface{}{
-			"level":      n,
-			"family":     ec.Family,
-			"field_bits": ec.FieldBits,
-			"p":          ec.P,
-			"a":          ec.A,
-			"b":          ec.B,
-			"gx":         ec.Gx,
-			"gy":         ec.Gy,
-			"qx":         ec.Qx,
-			"qy":         ec.Qy,
-			"solution":   *solution,
-			"verified":   verr == nil,
+			"level":              n,
+			"family":             ec.Family,
+			"field_bits":         ec.FieldBits,
+			"certified_solvable": ec.Certified,
+			"p":                  ec.P,
+			"a":                  ec.A,
+			"b":                  ec.B,
+			"gx":                 ec.Gx,
+			"gy":                 ec.Gy,
+			"qx":                 ec.Qx,
+			"qy":                 ec.Qy,
+			"solution":           *solution,
+			"verified":           verr == nil,
 		}
 		if verr != nil {
 			out["reason"] = verr.Error()

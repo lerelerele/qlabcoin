@@ -45,26 +45,34 @@ toy-order-finding
 
 toy-ecdlp
   FirstECDLPLevel (19) and above. A deterministic tiny elliptic curve
-  y² = x³ + ax + b over F_p per level, with G and Q = dG published. The win
-  condition is any scalar d' with d'G == Q. Field size follows the reference
-  model with a 3-bit floor (no meaningful curve exists below 3 bits).
+  y² = x³ + ax + b over F_p per level, with base point G and a public point Q.
+  The win condition is any scalar d with d·G == Q. Q is derived by hashing to a
+  point on the curve — no discrete log is used to build it, so none is stored or
+  recoverable from source. Small fields (<= 16 bits) use a prime-order curve, so
+  the group is cyclic and Q is provably in <G>: the challenge is certified
+  solvable (field size follows the reference model with a 3-bit floor).
 
 bitcoin-reference
-  Level 2330. The same ECDLP engine at 256 bits: a concrete, verifiable
-  challenge on an arbitrary educational curve — NOT secp256k1, holding nothing.
+  Level 2330. The same ECDLP engine at 256 bits, as a reference MARKER: a
+  concrete hash-derived point on an arbitrary educational curve — NOT secp256k1.
+  Its group order is beyond this build's point-counting horizon, so solvability
+  is not certified and no solution is known to exist.
 ```
 
 The boundary between `toy-order-finding` and `toy-ecdlp` is
 `FirstECDLPLevel`, derived from the resource model
 (`LogicalQubitsForECDLP(1) = 19`) rather than hard-coded.
 
-**Determinism caveat**: every family derives its parameters (and therefore its
-reference solution) from the level via hashing, so challenges are reproducible
-without coordination — and solvable by reading the source (`SolveOrder`,
-`ECDLPReferenceSolution`). The primitive distribution checks can likewise be
-satisfied by fabricated counts. What makes a submission credible is the audited
-protocol around it — circuit hash, backend report, independent reproductions on
-the chain — not secrecy.
+**Determinism caveat**: every family derives its parameters from the level via
+hashing, so challenges are reproducible without coordination. For
+order-finding, the answer is therefore also derivable from source (`SolveOrder`)
+— those levels are pedagogical. The primitive distribution checks can likewise
+be satisfied by fabricated counts. For ECDLP, only the curve and the point Q are
+derived; Q comes from a hash-to-point, so **no discrete log is stored or
+recoverable from source** — recovering `d` is a genuine computation. In all
+cases what makes a submission credible is the audited protocol around it —
+circuit hash, backend report, independent reproductions on the chain — not
+secrecy.
 
 ## Verification per family
 
