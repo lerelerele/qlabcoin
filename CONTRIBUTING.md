@@ -24,18 +24,39 @@ derived from it. Changes are made by pull request and accepted by merge.
 
 ## How to submit a solution
 
-1. Read the challenge and confirm your solution locally:
+Submissions are **signed** (ed25519). First set up your identity once, then sign
+each claim. Always pass `-chain` so you append to the canonical file, not the
+gitignored local default.
+
+1. **Set up your identity (once per author).** Generate a key pair offline and
+   keep the private key secret:
+
+   ```bash
+   go run ./cmd/qlabcoin keygen -author <your-handle>
+   # prints {author, pubkey, privkey}. Save privkey offline; never commit it.
+   ```
+
+2. **Register your public key** on the canonical chain (a separate PR, or the
+   same PR as your first claim):
+
+   ```bash
+   go run ./cmd/qlabcoin register -author <your-handle> \
+     -pubkey <pubkey-from-keygen> \
+     -chain qlabcoin-canonical-chain.json
+   ```
+
+3. Read the challenge and confirm your solution locally:
 
    ```bash
    go run ./cmd/qlabcoin challenge 5
    go run ./cmd/qlabcoin verify 5 -solution 36
    ```
 
-2. Record it on the canonical chain. Always pass `-chain` so you append to the
-   canonical file, not the gitignored local default:
+4. **Record it signed.** The `-author` and `-key` flags are mandatory:
 
    ```bash
    go run ./cmd/qlabcoin submit 5 -solution 36 \
+     -author <your-handle> -key <privkey-from-keygen> \
      -circuit sha256:<hash-of-your-circuit> \
      -circuit-desc "3-qubit order-finding circuit" \
      -measured '{"...":"raw measured outputs"}' \
@@ -45,26 +66,32 @@ derived from it. Changes are made by pull request and accepted by merge.
      -chain qlabcoin-canonical-chain.json
    ```
 
-3. Verify the whole chain still checks out, then open a PR with **only** the
+5. Verify the whole chain still checks out, then open a PR with **only** the
    change to `qlabcoin-canonical-chain.json`:
 
    ```bash
    go run ./cmd/qlabcoin verify-chain -chain qlabcoin-canonical-chain.json
    ```
 
+Reproductions (`reproduce`) follow the same pattern: they are signed, so pass
+`-author` and `-key` as well.
+
 ## What CI enforces
 
 Every pull request runs `.github/workflows/ci.yml`, which:
 
 - builds the project and runs `go vet` and the full test suite;
-- runs `verify-chain` on the canonical chain: hash links must be intact **and**
-  every recorded submission must still pass its family's classical verifier
-  (measurement distribution, multiplicative order, or `d·G == Q`).
+- runs `verify-chain` on the canonical chain: hash links must be intact, every
+  recorded submission must still pass its family's classical verifier
+  (measurement distribution, multiplicative order, or `d·G == Q`), **and** every
+  signed event (`submit`/`reproduce`) must carry a valid ed25519 signature from
+  a registered author.
 
-A PR that adds an unverifiable solution, breaks a hash link, or violates a
-lifecycle transition fails CI and will not be merged. Reproducibility metadata
-(circuit hash, backend report, notes) is not machine-checkable — it is reviewed
-by humans and is what makes a claim credible beyond the bare classical check.
+A PR that adds an unverifiable solution, breaks a hash link, violates a lifecycle
+transition, or carries an unsigned/invalidly-signed attributed event fails CI and
+will not be merged. Reproducibility metadata (circuit hash, backend report, notes)
+is not machine-checkable — it is reviewed by humans and is what makes a claim
+credible beyond the bare classical check.
 
 ## Honest-language rule
 

@@ -120,12 +120,14 @@ For level 5 that order is 36. Classical verification checks that the claim holds
 
 ## Submission and state
 
-`submit` verifies the solution classically and, on success, appends a `submit`
-event to the chain, advancing the level `open → claimed → verified → broken` in
-one step:
+`submit` verifies the solution classically and, on success, appends a signed
+`submit` event to the chain, advancing the level `open → claimed → verified →
+broken` in one step. The event is signed, so `-author` and `-key` are mandatory
+(see `docs/CHAIN_FORMAT.md` — "Signed events & identity"):
 
 ```bash
-go run ./cmd/qlabcoin submit 5 -solution 36 -circuit sha256:example
+go run ./cmd/qlabcoin submit 5 -solution 36 -circuit sha256:example \
+  -author <handle> -key <privkey-hex>
 ```
 
 State is **not** stored separately: it is derived by replaying the append-only
