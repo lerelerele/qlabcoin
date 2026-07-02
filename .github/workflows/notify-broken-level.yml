@@ -1,0 +1,73 @@
+name: notify-broken-level
+
+# After a merge to main, check whether any level is freshly `broken` (demonstrated
+# but not yet reopened). If so, open an issue reminding the maintainer to apply
+# the mitigation (harden) and open the next level (reopen). This is the manual
+# "apply mitigation -> open the next level" step of the research cycle.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Build CLI
+        run: go build -o bin/qlabcoin ./cmd/qlabcoin
+
+      - name: Verify canonical chain
+        run: ./bin/qlabcoin verify-chain -chain qlabcoin-canonical-chain.json
+
+      # Find levels that are broken but not yet reopened (i.e. awaiting the
+      # harden + reopen step). The state JSON is parsed with jq.
+      - name: Find freshly broken levels
+        id: broken
+        run: |
+          ./bin/qlabcoin state -chain qlabcoin-canonical-chain.json > state.json
+          # Extract level numbers whose state is exactly "broken".
+          BROKEN=$(jq -r '[.entries[] | select(.state=="broken") | .level] | join(",")' state.json)
+          echo "levels=$BROKEN" >> "$GITHUB_OUTPUT"
+          echo "Broken levels awaiting reopen: ${BROKEN:-none}"
+
+      # Open one tracking issue per freshly broken level. Dedup by a stable
+      # label + title search so reruns don't pile up duplicates.
+      - name: Open reminder issue for broken levels
+        if: steps.broken.outputs.levels != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Ensure the tracking label exists (idempotent).
+          gh label create "broken-level" --color D93F0B --description "A level is broken and awaits harden+reopen" --force 2>/dev/null || true
+          for level in $(echo "${{ steps.broken.outputs.levels }}" | tr ',' ' '); do
+            title="Level ${level} broken: apply mitigation (harden + reopen)"
+            # Skip if an open issue for this level already exists (label-based).
+            existing=$(gh issue list --label "broken-level" --search "in:title Level ${level} broken" --state open --json number --jq 'length')
+            if [ "$existing" != "0" ]; then
+              echo "Issue already exists for level ${level}; skipping."
+              continue
+            fi
+            gh issue create \
+              --title "$title" \
+              --label "broken-level" \
+              --body "A submission merged to main and level **${level}** is now \`broken\` on the canonical chain. The next step in the research cycle is to apply the mitigation and open the next level:
+
+          \`\`\`bash
+          go run ./cmd/qlabcoin transition ${level} hardened -chain qlabcoin-canonical-chain.json
+          go run ./cmd/qlabcoin transition ${level} reopened -chain qlabcoin-canonical-chain.json
+          \`\`\`
+
+          Then commit \`qlabcoin-canonical-chain.json\`, open a PR, and merge it. Once the level is \`reopened\` this issue can be closed."
+            echo "Opened reminder issue for level ${level}."
+          done
