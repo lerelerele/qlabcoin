@@ -10,24 +10,16 @@ on:
   # Allow manual runs from the Actions tab.
   workflow_dispatch:
 
-# pages: write lets us deploy via actions/deploy-pages. contents: write is no
-# longer needed because we no longer push to a gh-pages branch.
+# pages: write lets us deploy via actions/deploy-pages; id-token: write is
+# required for the OIDC token that deploy-pages uses. contents: read only.
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Only one publish at a time; a newer run cancels an in-flight older one.
-concurrency:
-  group: publish-dashboard
-  cancel-in-progress: true
-
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -53,6 +45,9 @@ jobs:
         run: |
           mkdir -p _site
           cp dashboard.html _site/index.html
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
