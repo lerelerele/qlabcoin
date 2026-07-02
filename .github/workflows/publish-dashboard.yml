@@ -10,13 +10,24 @@ on:
   # Allow manual runs from the Actions tab.
   workflow_dispatch:
 
-# The GITHUB_TOKEN needs write access to push to the gh-pages branch.
+# pages: write lets us deploy via actions/deploy-pages. contents: write is no
+# longer needed because we no longer push to a gh-pages branch.
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one publish at a time; a newer run cancels an in-flight older one.
+concurrency:
+  group: publish-dashboard
+  cancel-in-progress: true
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -36,20 +47,18 @@ jobs:
       - name: Regenerate dashboard
         run: ./bin/qlabcoin dashboard -html -out dashboard.html -chain qlabcoin-canonical-chain.json
 
-      # Publish: create an orphan gh-pages branch with only index.html and
-      # force-push it. Authentication goes through actions/checkout's persisted
-      # remote (it embeds the GITHUB_TOKEN), so we push to that remote.
-      - name: Publish to gh-pages
+      # actions/deploy-pages expects a single-page upload rooted at the path,
+      # so we place index.html in a clean _site directory.
+      - name: Stage site
         run: |
-          cd "$(mktemp -d)"
-          git init -q
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          cp "$GITHUB_WORKSPACE/dashboard.html" index.html
-          git add index.html
-          git commit -q -m "Publish dashboard from ${GITHUB_SHA::7}"
-          # Reuse the authenticated remote that actions/checkout created.
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git push -q -f origin HEAD:gh-pages
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          mkdir -p _site
+          cp dashboard.html _site/index.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
