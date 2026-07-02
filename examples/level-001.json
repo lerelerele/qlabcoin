@@ -5,7 +5,17 @@
   "family": "quantum-primitive",
   "status": "open",
   "target": {
+    "circuit": "H q0",
     "description": "Demonstrate useful logical attack qubits in a repeatable quantum subroutine.",
+    "expected_outcomes": [
+      "0",
+      "1"
+    ],
+    "hint": "run \"H q0\" for at least 100 shots and submit the outcome counts; expected outcomes [0 1] each within ±10% of 50%, at most 5% other outcomes",
+    "max_noise": 0.05,
+    "min_shots": 100,
+    "name": "plus-state",
+    "tolerance": 0.1,
     "type": "quantum-primitive",
     "win_condition": "submit measured output, circuit hash, and reproducible verification notes"
   },

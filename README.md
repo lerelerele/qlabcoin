@@ -32,22 +32,30 @@ For a 256-bit prime-field elliptic curve, this gives roughly 2330 logical qubits
 ## First Milestones
 
 ```text
-Level 1: one useful logical qubit in a verifiable circuit.
-Level 2: two useful logical qubits with entanglement or period-finding evidence.
-Level 3: three useful logical qubits in a repeatable quantum subroutine.
-Level 4+: toy order-finding or discrete-log challenges.
-Level 19+: first tiny ECDLP-shaped challenges under the reference resource model.
-Level 2330: approximate Bitcoin-like logical-qubit threshold, not a claim of practical breakability by itself.
+Level 1: one useful logical qubit in a verifiable circuit (plus-state distribution).
+Level 2: two useful logical qubits with entanglement evidence (Bell-pair distribution).
+Level 3: three useful logical qubits in a repeatable quantum subroutine (GHZ-3).
+Level 4+: toy order-finding challenges over tiny prime moduli.
+Level 19+: tiny ECDLP challenges on deterministic educational curves.
+Level 2330: approximate Bitcoin-like logical-qubit threshold, realized as a
+            256-bit educational-curve challenge — not secp256k1, not a claim
+            of practical breakability by itself.
 ```
+
+All levels are live: every family has a deterministic target and a classical
+verifier, so `challenge`, `verify`, and `submit` work end to end from level 1
+to the 2330 reference line. See `docs/CHALLENGE_FORMAT.md`.
 
 ## CLI
 
 ```bash
 go run ./cmd/qlabcoin clock -max 12
 go run ./cmd/qlabcoin level 19
-go run ./cmd/qlabcoin challenge 5            # includes toy-order target for levels 4-18
-go run ./cmd/qlabcoin verify 5 -solution 36  # check a claimed multiplicative order
-go run ./cmd/qlabcoin submit 5 -solution 36 -circuit sha256:...   # verify + record on chain
+go run ./cmd/qlabcoin challenge 5            # deterministic target for any level (1-3 primitive, 4-18 order, 19+ ECDLP)
+go run ./cmd/qlabcoin verify 1 -measured '{"0":512,"1":488}'      # levels 1-3: outcome distribution
+go run ./cmd/qlabcoin verify 5 -solution 36                       # levels 4-18: multiplicative order
+go run ./cmd/qlabcoin verify 19 -solution <d>                     # levels 19+: discrete log d with dG = Q
+go run ./cmd/qlabcoin submit 5 -solution 36 -circuit sha256:...   # verify + record on chain (any level)
 go run ./cmd/qlabcoin transition 5 hardened
 go run ./cmd/qlabcoin transition 5 reopened  # opens the next level
 go run ./cmd/qlabcoin reproduce 5 -author labB -circuit sha256:... -result reproduced  # independent corroboration

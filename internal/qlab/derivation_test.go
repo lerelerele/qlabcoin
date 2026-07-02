@@ -1,6 +1,9 @@
 package qlab
 
-import "testing"
+import (
+	"math/big"
+	"testing"
+)
 
 func TestDeriveRegistryGenesisOnlyIsEmpty(t *testing.T) {
 	c := newTestChain(t) // genesis only
@@ -76,19 +79,73 @@ func TestDeriveRegistryRejectsNonIntegerSolution(t *testing.T) {
 	}
 }
 
-// TestDeriveRegistrySkipsVerifierlessFamilies: families without a classical
-// verifier (e.g. quantum-primitive level 1) replay as recorded.
-func TestDeriveRegistrySkipsVerifierlessFamilies(t *testing.T) {
-	c := newTestChain(t)
-	sub := Submission{Solution: "bell-state report", CircuitHash: "sha256:abc", VerifiedAt: "t"}
-	_, _ = c.Append(Event{Type: EventSubmit, Level: 1, Submission: &sub, Timestamp: "t"})
-	r, err := DeriveRegistry(c)
-	if err != nil {
-		t.Fatalf("DeriveRegistry rejected a verifierless family: %v", err)
+// TestDeriveRegistryPrimitiveReplay: a primitive submission replays only if its
+// recorded measured outputs still pass the distribution check.
+func TestDeriveRegistryPrimitiveReplay(t *testing.T) {
+	good := newTestChain(t)
+	sub := Submission{
+		CircuitHash:     "sha256:abc",
+		VerifiedAt:      "t",
+		MeasuredOutputs: map[string]interface{}{"0": 512.0, "1": 488.0},
 	}
-	e, _ := r.Entry(1)
-	if e.State != StateBroken {
+	_, _ = good.Append(Event{Type: EventSubmit, Level: 1, Submission: &sub, Timestamp: "t"})
+	r, err := DeriveRegistry(good)
+	if err != nil {
+		t.Fatalf("valid primitive submission rejected on replay: %v", err)
+	}
+	if e, _ := r.Entry(1); e.State != StateBroken {
 		t.Fatalf("level 1 state = %s, want broken", e.State)
+	}
+
+	// Tampered counts (or a legacy submission without them) must fail replay.
+	bad := newTestChain(t)
+	badSub := Submission{
+		CircuitHash:     "sha256:abc",
+		VerifiedAt:      "t",
+		MeasuredOutputs: map[string]interface{}{"0": 900.0, "1": 100.0},
+	}
+	_, _ = bad.Append(Event{Type: EventSubmit, Level: 1, Submission: &badSub, Timestamp: "t"})
+	if _, err := DeriveRegistry(bad); err == nil {
+		t.Fatal("biased primitive counts replayed without error")
+	}
+
+	missing := newTestChain(t)
+	noCounts := Submission{Solution: "bell-state report", CircuitHash: "sha256:abc", VerifiedAt: "t"}
+	_, _ = missing.Append(Event{Type: EventSubmit, Level: 1, Submission: &noCounts, Timestamp: "t"})
+	if _, err := DeriveRegistry(missing); err == nil {
+		t.Fatal("primitive submission without measured outputs replayed without error")
+	}
+}
+
+// TestDeriveRegistryECDLPReplay: an ECDLP submission replays only if its
+// recorded scalar still satisfies d·G == Q.
+func TestDeriveRegistryECDLPReplay(t *testing.T) {
+	level := FirstECDLPLevel
+	good := newTestChain(t)
+	sub := Submission{
+		Solution:    ECDLPReferenceSolution(level),
+		CircuitHash: "sha256:abc",
+		VerifiedAt:  "t",
+	}
+	_, _ = good.Append(Event{Type: EventSubmit, Level: level, Submission: &sub, Timestamp: "t"})
+	r, err := DeriveRegistry(good)
+	if err != nil {
+		t.Fatalf("valid ECDLP submission rejected on replay: %v", err)
+	}
+	if e, _ := r.Entry(level); e.State != StateBroken {
+		t.Fatalf("level %d state = %s, want broken", level, e.State)
+	}
+
+	// d+1 provably fails: (d+1)G = Q+G != Q because G is not the identity.
+	ref, ok := new(big.Int).SetString(ECDLPReferenceSolution(level), 10)
+	if !ok {
+		t.Fatal("reference solution is not decimal")
+	}
+	bad := newTestChain(t)
+	badSub := Submission{Solution: ref.Add(ref, big.NewInt(1)).String(), CircuitHash: "sha256:abc", VerifiedAt: "t"}
+	_, _ = bad.Append(Event{Type: EventSubmit, Level: level, Submission: &badSub, Timestamp: "t"})
+	if _, err := DeriveRegistry(bad); err == nil {
+		t.Fatal("bogus ECDLP scalar replayed without error")
 	}
 }
 

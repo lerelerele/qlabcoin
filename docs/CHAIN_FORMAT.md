@@ -53,9 +53,10 @@ Use `qlabcoin verify-chain` to check that every `prev_hash` matches the recomput
 hash of the previous block, and that all events replay to a valid registry. Any
 edit to a recorded event (or to a link) breaks a hash link — except an edit to
 the *last* block, which no later `prev_hash` binds. To close that gap, replay
-re-runs classical verification on recorded solutions for families that have a
-verifier (today: toy-order-finding), so a tampered head block with a bogus
-solution is refused too.
+re-runs classical verification on every recorded submission: measured-outcome
+distributions for levels 1-3, multiplicative orders for levels 4-18, and
+discrete-log scalars (d·G == Q) for levels 19+. A tampered head block with a
+bogus solution is refused too.
 
 Every command that treats the chain as the source of truth (`submit`,
 `transition`, `reproduce`, `state`, `mitigation`) verifies the hash links right

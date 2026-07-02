@@ -33,24 +33,46 @@ go run ./cmd/qlabcoin challenge 1
 
 ```text
 quantum-primitive
-  Levels 1-3. Demonstrates useful logical qubits and repeatable circuits.
+  Levels 1-3. Deterministic primitive circuits (plus-state, Bell pair, GHZ-3);
+  the deliverable is a measured outcome distribution. Verified classically by
+  distribution shape: >= 100 shots, expected outcomes within ±10% of 50%, at
+  most 5% other outcomes.
 
 toy-order-finding
   Levels 4 up to FirstECDLPLevel-1. Early Shor-like period-finding and
   small discrete-log-shaped challenges over tiny groups. Cheap to verify
-  classically.
+  classically (order correct and minimal).
 
 toy-ecdlp
-  FirstECDLPLevel (19) and above. Tiny elliptic-curve-discrete-log-shaped
-  tasks under the reference resource model, starting when a one-bit curve fits.
+  FirstECDLPLevel (19) and above. A deterministic tiny elliptic curve
+  y² = x³ + ax + b over F_p per level, with G and Q = dG published. The win
+  condition is any scalar d' with d'G == Q. Field size follows the reference
+  model with a 3-bit floor (no meaningful curve exists below 3 bits).
 
 bitcoin-reference
-  Level 2330. A non-spendable reference marker for secp256k1-level estimates.
+  Level 2330. The same ECDLP engine at 256 bits: a concrete, verifiable
+  challenge on an arbitrary educational curve — NOT secp256k1, holding nothing.
 ```
 
 The boundary between `toy-order-finding` and `toy-ecdlp` is
 `FirstECDLPLevel`, derived from the resource model
 (`LogicalQubitsForECDLP(1) = 19`) rather than hard-coded.
+
+**Determinism caveat**: every family derives its parameters (and therefore its
+reference solution) from the level via hashing, so challenges are reproducible
+without coordination — and solvable by reading the source (`SolveOrder`,
+`ECDLPReferenceSolution`). The primitive distribution checks can likewise be
+satisfied by fabricated counts. What makes a submission credible is the audited
+protocol around it — circuit hash, backend report, independent reproductions on
+the chain — not secrecy.
+
+## Verification per family
+
+```bash
+go run ./cmd/qlabcoin verify 1  -measured '{"0":512,"1":488}'    # distribution
+go run ./cmd/qlabcoin verify 5  -solution 36                     # order
+go run ./cmd/qlabcoin verify 19 -solution <d>                    # discrete log
+```
 
 ## Toy order-finding targets
 

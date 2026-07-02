@@ -64,22 +64,37 @@ func applyEvent(r *Registry, ev Event) error {
 	}
 }
 
-// verifySubmissionOnReplay re-runs classical verification for families that have
-// a verifier. The chain records claims, but replay must not trust them blindly:
-// the head block is not bound by any later prev_hash, so a tampered head could
-// otherwise smuggle in a bogus solution that verify-chain would accept. Families
-// without a classical verifier (quantum-primitive, toy-ecdlp) are accepted as-is.
+// verifySubmissionOnReplay re-runs classical verification for every family.
+// The chain records claims, but replay must not trust them blindly: the head
+// block is not bound by any later prev_hash, so a tampered head could otherwise
+// smuggle in a bogus solution that verify-chain would accept.
+//
+//	levels 1-3    measured-outcome distribution vs the primitive target
+//	levels 4-18   multiplicative order, correct and minimal
+//	levels 19+    d·G == Q on the level's deterministic curve
 func verifySubmissionOnReplay(level int, s *Submission) error {
-	if !IsToyOrderLevel(level) {
-		return nil
-	}
-	toy := ToyOrderChallengeForLevel(level)
-	k, err := strconv.Atoi(s.Solution)
-	if err != nil {
-		return fmt.Errorf("level %d: recorded solution %q is not an integer", level, s.Solution)
-	}
-	if !VerifyOrder(level, toy.Modulus, toy.Base, k) {
-		return fmt.Errorf("level %d: recorded solution %q fails classical verification", level, s.Solution)
+	switch {
+	case IsPrimitiveLevel(level):
+		counts, err := CountsFromJSON(s.MeasuredOutputs)
+		if err != nil {
+			return fmt.Errorf("level %d: recorded measured outputs invalid: %w", level, err)
+		}
+		if err := VerifyPrimitive(level, counts); err != nil {
+			return fmt.Errorf("level %d: recorded measurements fail classical verification: %w", level, err)
+		}
+	case IsToyOrderLevel(level):
+		toy := ToyOrderChallengeForLevel(level)
+		k, err := strconv.Atoi(s.Solution)
+		if err != nil {
+			return fmt.Errorf("level %d: recorded solution %q is not an integer", level, s.Solution)
+		}
+		if !VerifyOrder(level, toy.Modulus, toy.Base, k) {
+			return fmt.Errorf("level %d: recorded solution %q fails classical verification", level, s.Solution)
+		}
+	case IsECDLPLevel(level):
+		if err := VerifyECDLP(level, s.Solution); err != nil {
+			return fmt.Errorf("level %d: recorded solution fails classical verification: %w", level, err)
+		}
 	}
 	return nil
 }

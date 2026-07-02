@@ -52,17 +52,24 @@ This does not include physical qubit overhead, error correction, routing, runtim
 
 ```text
 Levels 1-3:
-  Quantum primitive challenges.
+  Quantum primitive challenges (plus-state, Bell pair, GHZ-3). Verified
+  classically by measured-outcome distribution shape.
 
 Levels 4-18:
-  Toy period-finding / toy discrete-log challenges.
+  Toy period-finding / toy discrete-log challenges. Verified classically
+  (multiplicative order, correct and minimal).
 
 Levels 19+:
-  Tiny ECDLP-shaped challenges when the reference model can fit at least a one-bit curve.
+  Tiny ECDLP challenges on deterministic educational curves (3-bit field
+  floor). Verified classically: any d with dG = Q.
 
 Level 2330:
-  Approximate secp256k1 logical-qubit reference line.
+  Approximate secp256k1 logical-qubit reference line, realized as a concrete
+  256-bit educational-curve challenge (not secp256k1).
 ```
+
+All four families have classical verifiers; `submit` accepts any level, and
+chain replay re-runs the family's verifier on every recorded submission.
 
 ## 5. Challenge Lifecycle
 

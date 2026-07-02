@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"qlabcoin/internal/qlab"
@@ -59,8 +60,8 @@ Commands:
   qlabcoin clock [-max 20]
   qlabcoin level <n>
   qlabcoin challenge <n>
-  qlabcoin verify <n> -solution <k>
-  qlabcoin submit <n> -solution <k> -circuit <sha256:...> [-backend <json>] [-circuit-desc <text>] [-measured <json>] [-repro-notes <text>] [-proof <text>] [-chain <path>]
+  qlabcoin verify <n> [-solution <k|d>] [-measured <json>]
+  qlabcoin submit <n> -circuit <sha256:...> [-solution <k|d>] [-measured <json>] [-backend <json>] [-circuit-desc <text>] [-repro-notes <text>] [-proof <text>] [-chain <path>]
   qlabcoin transition <n> <state> [-chain <path>]
   qlabcoin reproduce <n> -author <lab> -circuit <sha256:...> -result reproduced|failed [-backend <json>] [-notes <text>] [-chain <path>]
   qlabcoin state [-chain <path>]
@@ -72,6 +73,8 @@ Commands:
   qlabcoin bitcoin
 
 States: open, claimed, verified, broken, hardened, reopened
+Solutions: levels 1-3 take -measured (outcome counts JSON); levels 4-18 take
+-solution <order>; levels 19+ take -solution <d> (decimal discrete log).
 Chain: a local append-only JSON file (default %s); the registry is derived from it.
 `, qlab.Version, qlab.DefaultChainPath)
 }
@@ -110,13 +113,34 @@ func challenge(args []string) {
 	}
 	n := mustLevel(args[0])
 	c := qlab.ChallengeForLevel(n)
-	// For toy-order-finding levels, embed the deterministic group parameters so a
-	// solver has everything needed to attempt the challenge.
-	if qlab.IsToyOrderLevel(n) {
+	// Embed the family's deterministic target parameters so a solver has
+	// everything needed to attempt the challenge.
+	switch {
+	case qlab.IsPrimitiveLevel(n):
+		pc := qlab.PrimitiveChallengeForLevel(n)
+		c.Target["name"] = pc.Name
+		c.Target["circuit"] = pc.Circuit
+		c.Target["expected_outcomes"] = pc.ExpectedOutcomes
+		c.Target["min_shots"] = pc.MinShots
+		c.Target["tolerance"] = pc.Tolerance
+		c.Target["max_noise"] = pc.MaxNoise
+		c.Target["hint"] = pc.Hint
+	case qlab.IsToyOrderLevel(n):
 		toy := qlab.ToyOrderChallengeForLevel(n)
 		c.Target["modulus"] = toy.Modulus
 		c.Target["base"] = toy.Base
 		c.Target["hint"] = toy.Hint
+	case qlab.IsECDLPLevel(n):
+		ec := qlab.ECDLPChallengeForLevel(n)
+		c.Target["field_bits"] = ec.FieldBits
+		c.Target["p"] = ec.P
+		c.Target["a"] = ec.A
+		c.Target["b"] = ec.B
+		c.Target["gx"] = ec.Gx
+		c.Target["gy"] = ec.Gy
+		c.Target["qx"] = ec.Qx
+		c.Target["qy"] = ec.Qy
+		c.Target["hint"] = ec.Hint
 	}
 	printJSON(c)
 }
@@ -154,12 +178,14 @@ func containsEqual(s string) bool {
 	return false
 }
 
-// verify reports whether -solution is the multiplicative order for the level's
-// deterministic toy group. Intended for inspection; submit() is the path that
-// mutates state.
+// verify checks a claimed result against the level's deterministic challenge:
+// measured outcome counts for levels 1-3 (-measured), a multiplicative order
+// for levels 4-18 (-solution), or a discrete-log scalar for levels 19+
+// (-solution). Intended for inspection; submit() is the path that mutates state.
 func verify(args []string) {
 	fs := flag.NewFlagSet("verify", flag.ExitOnError)
-	solution := fs.Int("solution", 0, "claimed multiplicative order to check")
+	solution := fs.String("solution", "", "claimed solution (order for levels 4-18, decimal d for 19+)")
+	measured := fs.String("measured", "", `measured outcome counts as JSON for levels 1-3, e.g. '{"00":510,"11":490}'`)
 	_ = fs.Parse(reorderFlags(args))
 	rest := fs.Args()
 	if len(rest) != 1 {
@@ -167,30 +193,106 @@ func verify(args []string) {
 		os.Exit(1)
 	}
 	n := mustLevel(rest[0])
-	if !qlab.IsToyOrderLevel(n) {
-		fmt.Fprintf(os.Stderr, "level %d is not a toy-order-finding challenge; classical verification is not implemented for that family yet\n", n)
-		os.Exit(2)
+	switch {
+	case qlab.IsPrimitiveLevel(n):
+		pc := qlab.PrimitiveChallengeForLevel(n)
+		counts := mustCounts(*measured, n)
+		verr := qlab.VerifyPrimitive(n, counts)
+		out := map[string]interface{}{
+			"level":             n,
+			"family":            "quantum-primitive",
+			"name":              pc.Name,
+			"circuit":           pc.Circuit,
+			"expected_outcomes": pc.ExpectedOutcomes,
+			"verified":          verr == nil,
+		}
+		if verr != nil {
+			out["reason"] = verr.Error()
+		}
+		printJSON(out)
+		if verr != nil {
+			os.Exit(1)
+		}
+	case qlab.IsToyOrderLevel(n):
+		k := mustOrder(*solution)
+		toy := qlab.ToyOrderChallengeForLevel(n)
+		ok := qlab.VerifyOrder(n, toy.Modulus, toy.Base, k)
+		printJSON(map[string]interface{}{
+			"level":      n,
+			"modulus":    toy.Modulus,
+			"base":       toy.Base,
+			"solution":   k,
+			"verified":   ok,
+			"true_order": qlab.SolveOrder(n, toy.Modulus, toy.Base),
+		})
+		if !ok {
+			os.Exit(1)
+		}
+	default: // ECDLP band, including the bitcoin-reference level
+		ec := qlab.ECDLPChallengeForLevel(n)
+		verr := qlab.VerifyECDLP(n, *solution)
+		out := map[string]interface{}{
+			"level":      n,
+			"family":     ec.Family,
+			"field_bits": ec.FieldBits,
+			"p":          ec.P,
+			"a":          ec.A,
+			"b":          ec.B,
+			"gx":         ec.Gx,
+			"gy":         ec.Gy,
+			"qx":         ec.Qx,
+			"qy":         ec.Qy,
+			"solution":   *solution,
+			"verified":   verr == nil,
+		}
+		if verr != nil {
+			out["reason"] = verr.Error()
+		}
+		printJSON(out)
+		if verr != nil {
+			os.Exit(1)
+		}
 	}
-	toy := qlab.ToyOrderChallengeForLevel(n)
-	ok := qlab.VerifyOrder(n, toy.Modulus, toy.Base, *solution)
-	printJSON(map[string]interface{}{
-		"level":      n,
-		"modulus":    toy.Modulus,
-		"base":       toy.Base,
-		"solution":   *solution,
-		"verified":   ok,
-		"true_order": qlab.SolveOrder(n, toy.Modulus, toy.Base),
-	})
-	if !ok {
+}
+
+// mustCounts parses the -measured JSON into outcome counts, or exits.
+func mustCounts(measured string, level int) map[string]int {
+	if measured == "" {
+		fmt.Fprintf(os.Stderr, "level %d is a quantum-primitive challenge: pass -measured with outcome counts JSON\n", level)
 		os.Exit(1)
 	}
+	var m map[string]interface{}
+	if err := json.Unmarshal([]byte(measured), &m); err != nil {
+		fmt.Fprintf(os.Stderr, "invalid -measured JSON: %v\n", err)
+		os.Exit(2)
+	}
+	counts, err := qlab.CountsFromJSON(m)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid -measured counts: %v\n", err)
+		os.Exit(2)
+	}
+	return counts
+}
+
+// mustOrder parses a toy-order solution (small positive integer), or exits.
+func mustOrder(solution string) int {
+	if solution == "" {
+		fmt.Fprintln(os.Stderr, "this level requires -solution with the claimed multiplicative order")
+		os.Exit(1)
+	}
+	k, err := strconv.Atoi(solution)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "-solution %q is not an integer\n", solution)
+		os.Exit(2)
+	}
+	return k
 }
 
 // submit records a submission against a level, verifies it classically, and on
 // success advances the entry open→broken in one step.
 func submit(args []string) {
 	fs := flag.NewFlagSet("submit", flag.ExitOnError)
-	solution := fs.Int("solution", 0, "claimed multiplicative order")
+	solution := fs.String("solution", "", "claimed solution (order for levels 4-18, decimal d for 19+)")
 	circuit := fs.String("circuit", "", "circuit hash, e.g. sha256:...")
 	backend := fs.String("backend", "", "backend metadata as JSON object")
 	circuitDesc := fs.String("circuit-desc", "", "human-readable circuit description")
@@ -209,10 +311,6 @@ func submit(args []string) {
 		fmt.Fprintln(os.Stderr, "submit requires -circuit")
 		os.Exit(1)
 	}
-	if !qlab.IsToyOrderLevel(n) {
-		fmt.Fprintf(os.Stderr, "level %d is not a toy-order-finding challenge; classical verification is not implemented for that family yet\n", n)
-		os.Exit(2)
-	}
 	var backendMap map[string]interface{}
 	if *backend != "" {
 		if err := json.Unmarshal([]byte(*backend), &backendMap); err != nil {
@@ -227,19 +325,46 @@ func submit(args []string) {
 			os.Exit(2)
 		}
 	}
-	toy := qlab.ToyOrderChallengeForLevel(n)
+	// Verify the claim classically before touching the chain. Each family has
+	// its own verifier; the accepted claim becomes the recorded solution.
+	solutionStr := ""
+	switch {
+	case qlab.IsPrimitiveLevel(n):
+		if measuredMap == nil {
+			fmt.Fprintf(os.Stderr, "level %d is a quantum-primitive challenge: pass -measured with outcome counts JSON\n", n)
+			os.Exit(1)
+		}
+		counts, err := qlab.CountsFromJSON(measuredMap)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "invalid -measured counts: %v\n", err)
+			os.Exit(2)
+		}
+		if err := qlab.VerifyPrimitive(n, counts); err != nil {
+			fmt.Fprintf(os.Stderr, "classical verification failed for level %d: %v\n", n, err)
+			os.Exit(1)
+		}
+		// The measured distribution is the evidence; there is no scalar solution.
+	case qlab.IsToyOrderLevel(n):
+		k := mustOrder(*solution)
+		toy := qlab.ToyOrderChallengeForLevel(n)
+		if !qlab.VerifyOrder(n, toy.Modulus, toy.Base, k) {
+			fmt.Fprintf(os.Stderr, "classical verification failed for level %d\n", n)
+			os.Exit(1)
+		}
+		solutionStr = strconv.Itoa(k)
+	default: // ECDLP band, including the bitcoin-reference level
+		if err := qlab.VerifyECDLP(n, *solution); err != nil {
+			fmt.Fprintf(os.Stderr, "classical verification failed for level %d: %v\n", n, err)
+			os.Exit(1)
+		}
+		solutionStr = strings.TrimSpace(*solution)
+	}
 
 	// Load chain and derive the current registry to validate against live state.
 	chain := loadChain(*chainPath)
 	reg, err := qlab.DeriveRegistry(chain)
 	if err != nil {
 		fatal(err)
-	}
-
-	// Verify the solution classically before recording anything.
-	if !qlab.VerifyOrder(n, toy.Modulus, toy.Base, *solution) {
-		fmt.Fprintf(os.Stderr, "classical verification failed for level %d\n", n)
-		os.Exit(1)
 	}
 	entry, _ := reg.Entry(n)
 	if entry.State != qlab.StateOpen {
@@ -252,7 +377,7 @@ func submit(args []string) {
 		ChallengeID:                entry.ChallengeID,
 		Level:                      n,
 		ClaimedLogicalAttackQubits: n,
-		Solution:                   strconv.Itoa(*solution),
+		Solution:                   solutionStr,
 		CircuitHash:                *circuit,
 		Backend:                    backendMap,
 		VerifiedAt:                 now,

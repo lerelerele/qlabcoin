@@ -71,8 +71,8 @@ func TestVerifyOrderRejectsWrongModulusOrBase(t *testing.T) {
 }
 
 // TestVerifyOrderRejectsOutOfBandLevels: only the toy-order-finding band is
-// verifiable by VerifyOrder. Quantum-primitive and ECDLP levels are out of scope
-// for classical order verification in this phase.
+// verifiable by VerifyOrder. Quantum-primitive and ECDLP levels have their own
+// verifiers (VerifyPrimitive, VerifyECDLP) and must be rejected here.
 func TestVerifyOrderRejectsOutOfBandLevels(t *testing.T) {
 	outOfBand := []int{0, 1, 3, FirstECDLPLevel, FirstECDLPLevel + 1, BitcoinLogicalThreshold}
 	for _, level := range outOfBand {

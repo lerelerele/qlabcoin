@@ -5,9 +5,18 @@
   "family": "toy-ecdlp",
   "status": "open",
   "target": {
+    "a": "1",
+    "b": "2",
     "curve_bits": 1,
     "description": "Solve a tiny ECDLP-shaped challenge of up to 1 reference curve bits.",
+    "field_bits": 3,
+    "gx": "1",
+    "gy": "3",
+    "hint": "recover d with Q = dG on y² = x³ + 1x + 2 over F_5 (any d with dG = Q verifies)",
+    "p": "5",
     "public_key_model": "Q = dG over a deliberately tiny educational curve",
+    "qx": "4",
+    "qy": "0",
     "type": "toy-ecdlp",
     "win_condition": "recover d and submit a classically verifiable proof"
   },
