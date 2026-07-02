@@ -16,4 +16,6 @@ qlabcoin-dashboard.html
 *.privkey
 
 # Working design notes (kept locally, not part of the repo)
-Nuevo Documento de texto.txt
+Nuevo Documento de texto*.txt
+*.env
+.env
