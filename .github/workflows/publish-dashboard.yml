@@ -10,16 +10,23 @@ on:
   # Allow manual runs from the Actions tab.
   workflow_dispatch:
 
-# pages: write lets us deploy via actions/deploy-pages; id-token: write is
-# required for the OIDC token that deploy-pages uses. contents: read only.
+# pages: write + id-token: write are required by actions/deploy-pages.
 permissions:
   contents: read
   pages: write
   id-token: write
 
+# Allow only one in-flight deployment; supersede an older run with a newer one.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -39,15 +46,14 @@ jobs:
       - name: Regenerate dashboard
         run: ./bin/qlabcoin dashboard -html -out dashboard.html -chain qlabcoin-canonical-chain.json
 
-      # actions/deploy-pages expects a single-page upload rooted at the path,
-      # so we place index.html in a clean _site directory.
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
       - name: Stage site
         run: |
           mkdir -p _site
           cp dashboard.html _site/index.html
-
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
