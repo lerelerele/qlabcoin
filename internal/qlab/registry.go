@@ -30,6 +30,7 @@ type EntryState string
 type Submission struct {
 	ChallengeID                string                 `json:"challenge_id"`
 	Level                      int                    `json:"level"`
+	Author                     string                 `json:"author,omitempty"`
 	ClaimedLogicalAttackQubits int                    `json:"claimed_logical_attack_qubits"`
 	Solution                   string                 `json:"solution"`
 	CircuitHash                string                 `json:"circuit_hash"`

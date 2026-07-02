@@ -11,5 +11,9 @@ qlabcoin-chain.json.tmp
 # Locally generated public dashboard (Phase 5); a committed snapshot lives in examples/
 qlabcoin-dashboard.html
 
+# Private ed25519 keys (signed-identity v2): never commit real author keys.
+*.priv
+*.privkey
+
 # Working design notes (kept locally, not part of the repo)
 Nuevo Documento de texto.txt

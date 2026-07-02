@@ -130,8 +130,10 @@ func TestDeriveMitigationModeFromRealChain(t *testing.T) {
 		t.Fatalf("empty chain mode = %s, want A", got)
 	}
 	// Break level 5 -> ModeC (band 5).
+	appendTestRegister(t, c)
 	sub := Submission{Solution: "36", CircuitHash: "sha256:abc", VerifiedAt: "t"}
-	c.Append(Event{Type: EventSubmit, Level: 5, Submission: &sub, Timestamp: "t"})
+	ev := signTestEvent(t, Event{Type: EventSubmit, Level: 5, Submission: &sub, Timestamp: "t"})
+	c.Append(ev)
 	r2, err := DeriveRegistry(c)
 	if err != nil {
 		t.Fatalf("derive: %v", err)

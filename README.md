@@ -57,10 +57,12 @@ go run ./cmd/qlabcoin challenge 5            # deterministic target for any leve
 go run ./cmd/qlabcoin verify 1 -measured '{"0":512,"1":488}'      # levels 1-3: outcome distribution
 go run ./cmd/qlabcoin verify 5 -solution 36                       # levels 4-18: multiplicative order
 go run ./cmd/qlabcoin verify 19 -solution <d>                     # levels 19+: discrete log d with dG = Q
-go run ./cmd/qlabcoin submit 5 -solution 36 -circuit sha256:...   # verify + record on chain (any level)
+go run ./cmd/qlabcoin keygen -author labA                         # generate an ed25519 key pair (offline)
+go run ./cmd/qlabcoin register -author labA -pubkey <hex>         # publish/rotate a public key on chain
+go run ./cmd/qlabcoin submit 5 -solution 36 -circuit sha256:... -author labA -key <hex>   # signed: verify + record
 go run ./cmd/qlabcoin transition 5 hardened
 go run ./cmd/qlabcoin transition 5 reopened  # opens the next level
-go run ./cmd/qlabcoin reproduce 5 -author labB -circuit sha256:... -result reproduced  # independent corroboration
+go run ./cmd/qlabcoin reproduce 5 -author labA -key <hex> -circuit sha256:... -result reproduced  # signed corroboration
 go run ./cmd/qlabcoin state                  # registry derived from the chain
 go run ./cmd/qlabcoin history                # dump the chain (blocks + hashes)
 go run ./cmd/qlabcoin verify-chain           # check chain integrity + replay
@@ -77,8 +79,10 @@ Challenge state lives on an **append-only event chain** (default
 `qlabcoin-chain.json`, not committed). Each block chains to the previous one by
 `sha256`; the registry is derived by replaying the chain. The lifecycle is
 `open → claimed → verified → broken → hardened → reopened`; `submit` records a
-verified solution and `transition` records harden/reopen events. See
-`docs/CHAIN_FORMAT.md`.
+verified solution and `transition` records harden/reopen events. `submit` and
+`reproduce` events are **signed with ed25519**: an author registers a public key
+(`register`) and signs each attributed event, so a forged or unsigned event fails
+replay. See `docs/CHAIN_FORMAT.md`.
 
 ## Distance Profiles
 

@@ -23,6 +23,7 @@ const (
 	EventHarden    EventType = "harden"    // mitigation applied (broken -> hardened)
 	EventReopen    EventType = "reopen"    // level reopened, next level opened
 	EventReproduce EventType = "reproduce" // independent corroboration of a broken level
+	EventRegister  EventType = "register"  // an author publishes/rotates their ed25519 key
 )
 
 // EventType labels a chain event.
@@ -50,8 +51,11 @@ type Reproduction struct {
 type Event struct {
 	Type         EventType     `json:"type"`
 	Level        int           `json:"level"`
+	Author       string        `json:"author,omitempty"`       // signer handle (submit/reproduce/register)
+	Signature    []byte        `json:"signature,omitempty"`    // ed25519 over SigningBytes (submit/reproduce)
 	Submission   *Submission   `json:"submission,omitempty"`   // present only for EventSubmit
 	Reproduction *Reproduction `json:"reproduction,omitempty"` // present only for EventReproduce
+	Identity     *Identity     `json:"identity,omitempty"`     // present only for EventRegister
 	Timestamp    string        `json:"timestamp"`              // RFC3339 UTC
 }
 

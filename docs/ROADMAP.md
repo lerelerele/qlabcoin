@@ -60,6 +60,16 @@
   Level 2330 is a concrete 256-bit reference marker. See docs/CHALLENGE_FORMAT.md.
 - Chain replay re-verifies every recorded submission per family.
 
+## Signed Identity (done — v2)
+
+- Authors register an ed25519 public key on chain (`register`); `submit` and
+  `reproduce` events carry an ed25519 signature over a canonical payload.
+- Replay verifies signatures against the registered key in strict mode (missing
+  signature, unregistered author, or tampered payload all fail the chain).
+- Commands: `keygen` (offline key pair), `register` (publish/rotate), and
+  `-author`/`-key` flags on `submit`/`reproduce`. See docs/CHAIN_FORMAT.md.
+- Attribution, not a PKI: real-world authorship still rests on GitHub PR + CI.
+
 ## Publication + External Review (in progress)
 
 - LICENSE, CONTRIBUTING.md (submission-by-PR against the canonical chain), and
@@ -67,4 +77,3 @@
   (`qlabcoin-canonical-chain.json`) starts at genesis.
 - Remaining: create the public remote and push; host the dashboard; accept
   university challenge submissions and reproducibility reviews as PRs.
-- Open design question: signed author identity (see docs/NEXT_STEPS.md).

@@ -1,19 +1,18 @@
 {
   "level": 5,
   "challenge_id": "qlab-L005-b6816f32eb",
-  "state": "broken",
+  "state": "reopened",
   "submission": {
     "challenge_id": "qlab-L005-b6816f32eb",
     "level": 5,
+    "author": "test-author",
     "claimed_logical_attack_qubits": 5,
     "solution": "36",
     "circuit_hash": "sha256:example",
-    "backend": {
-      "hardware": "example university lab",
-      "logical_qubits": 5,
-      "notes": "demonstration run",
-      "physical_qubits": 12
-    },
-    "verified_at": "2026-07-01T00:00:00Z"
-  }
+    "verified_at": "2026-07-01T00:00:00Z",
+    "circuit_description": "toy order-finding circuit over Z_37",
+    "reproducibility_notes": "run on a state-vector simulator, 1024 shots",
+    "verification_proof": "2^36 mod 37 == 1, minimal over prime factors"
+  },
+  "reproductions": 1
 }

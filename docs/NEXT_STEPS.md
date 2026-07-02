@@ -1,10 +1,11 @@
 # Next Steps
 
-Phases 1–6 are done: all level families (1 → 2330) have deterministic targets
-and classical verifiers, state lives on an append-only verified chain, the
-mitigation ladder and the multi-profile Bitcoin distance model are implemented,
-and there is a public dashboard. See the `docs/` for the model and `README.md`
-for the command surface.
+Phases 1–6 are done and chain events are now signed (ed25519 attribution): all
+level families (1 → 2330) have deterministic targets and classical verifiers,
+state lives on an append-only verified chain with signed `submit`/`reproduce`
+events, the mitigation ladder and the multi-profile Bitcoin distance model are
+implemented, and there is a public dashboard. See the `docs/` for the model and
+`README.md` for the command surface.
 
 ## Publishing (the current focus)
 
@@ -20,16 +21,19 @@ about running it in the open rather than adding engine features.
    only the genesis block — the honest starting state. Real demonstrations land
    as PRs.
 
-## Identity (the main open design question)
+## Identity (done — v2 implemented)
 
-Chain events are unauthenticated: the `author` of a reproduction is a free-form
-string, and anyone with the file can append a block. For a real multi-lab clock:
+Chain events are cryptographically attributed. Authors register an ed25519
+public key on chain (`register`), and every `submit`/`reproduce` event carries
+an ed25519 signature over a canonical payload that the replay verifies against
+the registered key. Signatures are mandatory (strict mode); a signed event from
+an unregistered author, a missing signature, or a tampered payload all fail
+replay. See `docs/CHAIN_FORMAT.md` ("Signed events & identity").
 
-1. **v1 (pragmatic):** identity comes from GitHub — who opens the PR — with CI as
-   the arbiter. Good enough to start.
-2. **v2 (robust):** signed events (e.g. ed25519 keys recorded on the chain), so a
-   submission or reproduction is cryptographically attributable and cannot be
-   forged even by someone editing the file directly.
+This is attribution, not a PKI: the chain proves an event came from the holder of
+a key; "who the author is in the real world" still rests on v1 (GitHub PR author
++ CI). A future hardening could add a key-revocation/compromise flow beyond the
+current simple re-register (rotation).
 
 ## Smaller follow-ups
 

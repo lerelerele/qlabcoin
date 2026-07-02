@@ -97,10 +97,10 @@ func TestCountsFromJSON(t *testing.T) {
 		t.Fatalf("counts mangled: %v", counts)
 	}
 	bad := []map[string]interface{}{
-		nil,                              // empty
-		{"0": "many"},                    // non-numeric
-		{"0": -1.0},                      // negative
-		{"0": 1.5},                       // fractional
+		nil,           // empty
+		{"0": "many"}, // non-numeric
+		{"0": -1.0},   // negative
+		{"0": 1.5},    // fractional
 	}
 	for _, m := range bad {
 		if _, err := CountsFromJSON(m); err == nil {

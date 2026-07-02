@@ -10,15 +10,12 @@
       "prev_hash": "91e2a70383636a6a574f1d55fea05077d06e8f4b0de9530d107eccfd510a6a82",
       "events": [
         {
-          "type": "submit",
-          "level": 5,
-          "submission": {
-            "challenge_id": "qlab-L005-b6816f32eb",
-            "level": 5,
-            "claimed_logical_attack_qubits": 5,
-            "solution": "36",
-            "circuit_hash": "sha256:example",
-            "verified_at": "2026-07-01T00:00:00Z"
+          "type": "register",
+          "level": 0,
+          "author": "test-author",
+          "identity": {
+            "author": "test-author",
+            "pubkey": "qlJOXpgWviSY+IJ5iDUjuOSd9U8KGmiK4JXJEr0u5HE="
           },
           "timestamp": "2026-07-01T00:00:00Z"
         }
@@ -26,7 +23,32 @@
     },
     {
       "index": 2,
-      "prev_hash": "b45cedbfde1cc3d9deded045511a7ba127058d37e51ebfa5735bfc34697fa7be",
+      "prev_hash": "e5a1158fa9a74c5f7ec47d569c82f29119f4b30d8600ce96d6088a84fe066bbc",
+      "events": [
+        {
+          "type": "submit",
+          "level": 5,
+          "author": "test-author",
+          "signature": "kQWk7K9XC8pAGPjcZGj99BgaALXil1i2oitvrQPMtyy2NmCiWT+5wchhtajBRxEoLqOHrwYOTgZkZC4xtXLQDg==",
+          "submission": {
+            "challenge_id": "qlab-L005-b6816f32eb",
+            "level": 5,
+            "author": "test-author",
+            "claimed_logical_attack_qubits": 5,
+            "solution": "36",
+            "circuit_hash": "sha256:example",
+            "verified_at": "2026-07-01T00:00:00Z",
+            "circuit_description": "toy order-finding circuit over Z_37",
+            "reproducibility_notes": "run on a state-vector simulator, 1024 shots",
+            "verification_proof": "2^36 mod 37 == 1, minimal over prime factors"
+          },
+          "timestamp": "2026-07-01T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "prev_hash": "4ddc1fbe5cc526da8a05b27231f51f59512db4a6379e095210dc21da78e06bff",
       "events": [
         {
           "type": "harden",
@@ -36,8 +58,8 @@
       ]
     },
     {
-      "index": 3,
-      "prev_hash": "20ce77210e55719aa8827afbcb420b42373cac3ca504dca351e153585a14025f",
+      "index": 4,
+      "prev_hash": "99793f0d1e3b6feb20342fa5f0d85174e24ea36b9e43a65b9d49600c261800d8",
       "events": [
         {
           "type": "reopen",
@@ -47,16 +69,19 @@
       ]
     },
     {
-      "index": 4,
-      "prev_hash": "5b9b8b847189bc183d66a9cb58ec3037998d4b62c99b30a8ab765ee8a8864869",
+      "index": 5,
+      "prev_hash": "1396b2235cd00d7c3ec2f64817f38b40360184c005e15be23d6160fc581d5b47",
       "events": [
         {
           "type": "reproduce",
           "level": 5,
+          "author": "test-author",
+          "signature": "RCNqPAV1/6gBCE5ySUxwSvT+sK7dWaVV765V5VQEUcesD9jCjSYLlb6vIUCEG8BF5hIvjJXoO5bSFz+fBg3sDw==",
           "reproduction": {
-            "author": "lab-b",
+            "author": "test-author",
             "circuit_hash": "sha256:reproduction",
             "result": "reproduced",
+            "notes": "independent run on a different backend",
             "timestamp": "2026-07-01T00:00:00Z"
           },
           "timestamp": "2026-07-01T00:00:00Z"

@@ -14,13 +14,14 @@ import (
 // pinpointing the offending block/level.
 func DeriveRegistry(c *Chain) (*Registry, error) {
 	r := NewRegistry()
+	keys := newIdentityRegistry()
 	blocks := c.Blocks()
 	for bi, b := range blocks {
 		if bi == 0 {
 			continue // genesis block carries no events
 		}
 		for _, ev := range b.Events {
-			if err := applyEvent(r, ev); err != nil {
+			if err := applyEvent(r, keys, ev); err != nil {
 				return nil, fmt.Errorf("block %d: %w", b.Index, err)
 			}
 		}
@@ -32,9 +33,19 @@ func DeriveRegistry(c *Chain) (*Registry, error) {
 // validation in registry.go: a submit requires an open level, and transitions
 // must follow ValidTransition. The submission's VerifiedAt is taken from the
 // event as-is (it was stamped when the block was created).
-func applyEvent(r *Registry, ev Event) error {
+//
+// Attributed events (submit, reproduce) are signature-checked in strict mode:
+// the author must be registered (a prior register event) and the ed25519
+// signature over the canonical payload must verify. Register/harden/reopen are
+// not attributed and carry no signature.
+func applyEvent(r *Registry, keys *identityRegistry, ev Event) error {
 	switch ev.Type {
+	case EventRegister:
+		return applyRegister(keys, ev)
 	case EventSubmit:
+		if err := verifyAttributed(keys, ev); err != nil {
+			return err
+		}
 		if ev.Submission == nil {
 			return fmt.Errorf("level %d: submit event has no submission", ev.Level)
 		}
@@ -48,6 +59,7 @@ func applyEvent(r *Registry, ev Event) error {
 		s := *ev.Submission
 		s.ChallengeID = e.ChallengeID
 		s.Level = ev.Level
+		s.Author = ev.Author
 		if s.ClaimedLogicalAttackQubits == 0 {
 			s.ClaimedLogicalAttackQubits = ev.Level
 		}
@@ -58,6 +70,9 @@ func applyEvent(r *Registry, ev Event) error {
 	case EventReopen:
 		return applyEventTransition(r, ev.Level, StateReopened)
 	case EventReproduce:
+		if err := verifyAttributed(keys, ev); err != nil {
+			return err
+		}
 		return applyReproduction(r, ev)
 	default:
 		return fmt.Errorf("level %d: unknown event type %q", ev.Level, ev.Type)
@@ -135,6 +150,52 @@ func applyEventTransition(r *Registry, level int, to EntryState) error {
 		return fmt.Errorf("invalid transition for level %d: %s → %s", level, e.State, to)
 	}
 	return applyTransition(r, e, to)
+}
+
+// identityRegistry tracks author -> public key bindings seen during replay. It
+// is populated by EventRegister and consulted to verify attributed events. A
+// re-register overwrites the prior key (simple rotation).
+type identityRegistry struct {
+	keys map[string][]byte
+}
+
+func newIdentityRegistry() *identityRegistry {
+	return &identityRegistry{keys: make(map[string][]byte)}
+}
+
+// applyRegister records (or rotates) an author's public key.
+func applyRegister(keys *identityRegistry, ev Event) error {
+	if ev.Identity == nil {
+		return fmt.Errorf("register event has no identity")
+	}
+	if ev.Identity.Author == "" {
+		return fmt.Errorf("register event has no author")
+	}
+	if !ValidPublicKey(ev.Identity.PubKey) {
+		return fmt.Errorf("register event for %q: invalid ed25519 public key (%d bytes)", ev.Identity.Author, len(ev.Identity.PubKey))
+	}
+	keys.keys[ev.Identity.Author] = ev.Identity.PubKey
+	return nil
+}
+
+// verifyAttributed enforces strict signed-identity mode for submit/reproduce:
+// the event must name an author, that author must be registered by a prior
+// register event, and the signature over the canonical payload must verify.
+func verifyAttributed(keys *identityRegistry, ev Event) error {
+	if ev.Author == "" {
+		return fmt.Errorf("level %d %q event: missing author", ev.Level, ev.Type)
+	}
+	if len(ev.Signature) == 0 {
+		return fmt.Errorf("level %d %q event by %q: missing signature", ev.Level, ev.Type, ev.Author)
+	}
+	pub, ok := keys.keys[ev.Author]
+	if !ok {
+		return fmt.Errorf("level %d %q event by %q: author not registered", ev.Level, ev.Type, ev.Author)
+	}
+	if err := VerifyEventSignature(pub, ev, ev.Signature); err != nil {
+		return fmt.Errorf("level %d %q event by %q: %w", ev.Level, ev.Type, ev.Author, err)
+	}
+	return nil
 }
 
 // Mitigation band boundaries. The highest demonstrated (broken) level maps to a

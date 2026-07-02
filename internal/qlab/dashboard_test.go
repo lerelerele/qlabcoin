@@ -12,8 +12,9 @@ func dashboardFromLifecycle(t *testing.T) Dashboard {
 	c := chainWithBrokenLevel5(t)
 	_, _ = c.Append(Event{Type: EventHarden, Level: 5, Timestamp: "t"})
 	_, _ = c.Append(Event{Type: EventReopen, Level: 5, Timestamp: "t"})
-	rep := &Reproduction{Author: "lab-b", CircuitHash: "sha256:rep", Result: ReproductionReproduced}
-	_, _ = c.Append(Event{Type: EventReproduce, Level: 5, Reproduction: rep, Timestamp: "t"})
+	rep := &Reproduction{Author: "test-author", CircuitHash: "sha256:rep", Result: ReproductionReproduced}
+	repEv := signTestEvent(t, Event{Type: EventReproduce, Level: 5, Reproduction: rep, Timestamp: "t"})
+	_, _ = c.Append(repEv)
 	r, err := DeriveRegistry(c)
 	if err != nil {
 		t.Fatalf("DeriveRegistry: %v", err)
@@ -38,8 +39,8 @@ func TestBuildDashboardLifecycle(t *testing.T) {
 	if d.MitigationMode != ModeC {
 		t.Fatalf("mode = %s, want C (level 5 broken)", d.MitigationMode)
 	}
-	if d.Blocks != 5 { // genesis + 4 events
-		t.Fatalf("blocks = %d, want 5", d.Blocks)
+	if d.Blocks != 6 { // genesis + register + submit + harden + reopen + reproduce
+		t.Fatalf("blocks = %d, want 6", d.Blocks)
 	}
 	if len(d.Distances) != len(QECProfiles()) {
 		t.Fatalf("distances = %d entries, want %d", len(d.Distances), len(QECProfiles()))

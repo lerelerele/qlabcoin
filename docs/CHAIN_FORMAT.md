@@ -70,11 +70,12 @@ submit     a verified solution was accepted (open -> broken)
 harden     mitigation applied (broken -> hardened)
 reopen     level reopened, next level opened (hardened -> reopened)
 reproduce  independent corroboration of an already-broken level
+register   an author publishes/rotates their ed25519 public key
 ```
 
 Each event carries a `level` and an RFC3339 UTC `timestamp`. A `submit` event
-also carries the full `Submission` (challenge id, solution, circuit hash, backend
-metadata, and the `verified_at` timestamp). A `reproduce` event carries a
+also carries the full `Submission` (challenge id, author, solution, circuit hash,
+backend metadata, and the `verified_at` timestamp). A `reproduce` event carries a
 `Reproduction`:
 
 ```json
@@ -97,6 +98,37 @@ metadata, and the `verified_at` timestamp). A `reproduce` event carries a
 or `"failed"` (recorded for audit, does not raise the counter). A `reproduce`
 event on a level that is not broken/hardened/reopened is invalid and fails
 `verify-chain` and `state`.
+
+## Signed events & identity
+
+Attributed events (`submit`, `reproduce`) are **signed** with ed25519; the
+signature is mandatory (strict mode). The flow:
+
+1. An author generates a key pair offline (`qlabcoin keygen -author <handle>`).
+2. They publish the public key on chain (`qlabcoin register -author <handle>
+   -pubkey <hex>`), which appends a `register` event. Re-registering rotates the
+   key (the newest key wins).
+3. They sign `submit`/`reproduce` events with the matching private key
+   (`-author <handle> -key <hex>`).
+
+The signature covers a **canonical payload** (`SigningBytes`) — the event minus
+its `signature` field, sha256-hashed for stability:
+
+```text
+signing payload = sha256(json{type, level, author, submission|reproduction, timestamp})
+signature       = ed25519.sign(privkey, signing payload)
+```
+
+During replay, `verify-chain` and every chain-reading command enforce: the author
+must be **registered** by a prior `register` event, and the signature must
+verify under the registered public key. A signed event from an unregistered
+author, a missing signature, or a tampered payload all fail replay and are
+treated as a corrupt chain. `register`, `harden`, and `reopen` are not signed
+(they are not attributed claims).
+
+This is **attribution, not a PKI**: the chain proves an event was produced by the
+holder of a key, and that a registered author exists; "who the author is in the
+real world" remains a social/PR concern (v1: GitHub PR author; this v2: the key).
 
 ## Derived state
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -44,6 +45,10 @@ func main() {
 		distance(os.Args[2:])
 	case "dashboard":
 		dashboard(os.Args[2:])
+	case "keygen":
+		keygen(os.Args[2:])
+	case "register":
+		register(os.Args[2:])
 	case "bitcoin":
 		bitcoin()
 	default:
@@ -61,9 +66,11 @@ Commands:
   qlabcoin level <n>
   qlabcoin challenge <n>
   qlabcoin verify <n> [-solution <k|d>] [-measured <json>]
-  qlabcoin submit <n> -circuit <sha256:...> [-solution <k|d>] [-measured <json>] [-backend <json>] [-circuit-desc <text>] [-repro-notes <text>] [-proof <text>] [-chain <path>]
+  qlabcoin keygen -author <handle>                          # generate an ed25519 key pair (offline)
+  qlabcoin register -author <handle> -pubkey <hex> [-chain <path>]   # publish/rotate a public key on chain
+  qlabcoin submit <n> -circuit <sha256:...> -author <handle> -key <hex> [-solution <k|d>] [-measured <json>] [-backend <json>] [-circuit-desc <text>] [-repro-notes <text>] [-proof <text>] [-chain <path>]
   qlabcoin transition <n> <state> [-chain <path>]
-  qlabcoin reproduce <n> -author <lab> -circuit <sha256:...> -result reproduced|failed [-backend <json>] [-notes <text>] [-chain <path>]
+  qlabcoin reproduce <n> -author <handle> -key <hex> -circuit <sha256:...> -result reproduced|failed [-backend <json>] [-notes <text>] [-chain <path>]
   qlabcoin state [-chain <path>]
   qlabcoin history [-chain <path>]
   qlabcoin verify-chain [-chain <path>]
@@ -75,6 +82,8 @@ Commands:
 States: open, claimed, verified, broken, hardened, reopened
 Solutions: levels 1-3 take -measured (outcome counts JSON); levels 4-18 take
 -solution <order>; levels 19+ take -solution <d> (decimal discrete log).
+Identity: submit and reproduce events are signed (ed25519). Register a public key
+first (register), then sign with the matching private key (-key).
 Chain: a local append-only JSON file (default %s); the registry is derived from it.
 `, qlab.Version, qlab.DefaultChainPath)
 }
@@ -304,6 +313,8 @@ func submit(args []string) {
 	measured := fs.String("measured", "", "measured outputs as JSON object")
 	reproNotes := fs.String("repro-notes", "", "reproducibility notes")
 	proof := fs.String("proof", "", "classical verification proof")
+	author := fs.String("author", "", "registered author handle signing this submission (required)")
+	keyHex := fs.String("key", "", "ed25519 private key (hex) to sign the event (required)")
 	chainPath := fs.String("chain", qlab.DefaultChainPath, "chain file path")
 	_ = fs.Parse(reorderFlags(args))
 	rest := fs.Args()
@@ -314,6 +325,10 @@ func submit(args []string) {
 	n := mustLevel(rest[0])
 	if *circuit == "" {
 		fmt.Fprintln(os.Stderr, "submit requires -circuit")
+		os.Exit(1)
+	}
+	if *author == "" || *keyHex == "" {
+		fmt.Fprintln(os.Stderr, "submit requires -author and -key (signed events are mandatory)")
 		os.Exit(1)
 	}
 	var backendMap map[string]interface{}
@@ -394,9 +409,16 @@ func submit(args []string) {
 	ev := qlab.Event{
 		Type:       qlab.EventSubmit,
 		Level:      n,
+		Author:     *author,
 		Submission: &sub,
 		Timestamp:  now,
 	}
+	sig, err := signEvent(*keyHex, ev)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "signing failed: %v\n", err)
+		os.Exit(2)
+	}
+	ev.Signature = sig
 	if _, err := chain.Append(ev); err != nil {
 		fatal(err)
 	}
@@ -462,6 +484,7 @@ func reproduce(args []string) {
 	result := fs.String("result", "", "outcome: reproduced|failed (required)")
 	backend := fs.String("backend", "", "backend metadata as JSON object")
 	notes := fs.String("notes", "", "free-form reproducibility notes")
+	keyHex := fs.String("key", "", "ed25519 private key (hex) to sign the event (required)")
 	chainPath := fs.String("chain", qlab.DefaultChainPath, "chain file path")
 	_ = fs.Parse(reorderFlags(args))
 	rest := fs.Args()
@@ -470,8 +493,8 @@ func reproduce(args []string) {
 		os.Exit(1)
 	}
 	n := mustLevel(rest[0])
-	if *author == "" || *circuit == "" || *result == "" {
-		fmt.Fprintln(os.Stderr, "reproduce requires -author, -circuit and -result")
+	if *author == "" || *circuit == "" || *result == "" || *keyHex == "" {
+		fmt.Fprintln(os.Stderr, "reproduce requires -author, -circuit, -result and -key")
 		os.Exit(1)
 	}
 	if *result != qlab.ReproductionReproduced && *result != qlab.ReproductionFailed {
@@ -507,7 +530,14 @@ func reproduce(args []string) {
 		Notes:       *notes,
 		Timestamp:   now,
 	}
-	if _, err := chain.Append(qlab.Event{Type: qlab.EventReproduce, Level: n, Reproduction: &rep, Timestamp: now}); err != nil {
+	ev := qlab.Event{Type: qlab.EventReproduce, Level: n, Author: *author, Reproduction: &rep, Timestamp: now}
+	sig, err := signEvent(*keyHex, ev)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "signing failed: %v\n", err)
+		os.Exit(2)
+	}
+	ev.Signature = sig
+	if _, err := chain.Append(ev); err != nil {
 		fatal(err)
 	}
 	if err := chain.Save(); err != nil {
@@ -740,6 +770,69 @@ func dashboard(args []string) {
 	fmt.Println("wrote", path)
 }
 
+// keygen creates a fresh ed25519 key pair for an author. The public key is meant
+// to be registered on chain (see register); the private key must be kept offline
+// by the author. Nothing is written to the chain.
+func keygen(args []string) {
+	fs := flag.NewFlagSet("keygen", flag.ExitOnError)
+	author := fs.String("author", "", "author handle this key belongs to (required)")
+	_ = fs.Parse(reorderFlags(args))
+	if *author == "" {
+		fmt.Fprintln(os.Stderr, "keygen requires -author")
+		os.Exit(1)
+	}
+	pub, priv, err := qlab.GenerateIdentity()
+	if err != nil {
+		fatal(err)
+	}
+	printJSON(map[string]interface{}{
+		"author":  *author,
+		"pubkey":  hex.EncodeToString(pub),
+		"privkey": hex.EncodeToString(priv),
+		"note":    "keep the private key offline; register the public key on chain with `register`",
+	})
+}
+
+// register appends an EventRegister, publishing (or rotating) an author's
+// ed25519 public key. The author can then sign submit/reproduce events.
+func register(args []string) {
+	fs := flag.NewFlagSet("register", flag.ExitOnError)
+	author := fs.String("author", "", "author handle to register (required)")
+	pubkey := fs.String("pubkey", "", "ed25519 public key as hex (required)")
+	chainPath := fs.String("chain", qlab.DefaultChainPath, "chain file path")
+	_ = fs.Parse(reorderFlags(args))
+	if *author == "" || *pubkey == "" {
+		fmt.Fprintln(os.Stderr, "register requires -author and -pubkey")
+		os.Exit(1)
+	}
+	pub, err := decodePubKeyHex(*pubkey)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	chain := loadChain(*chainPath)
+	now := nowRFC3339()
+	ev := qlab.Event{
+		Type:      qlab.EventRegister,
+		Level:     0, // register is global, not level-scoped
+		Author:    *author,
+		Identity:  &qlab.Identity{Author: *author, PubKey: pub},
+		Timestamp: now,
+	}
+	if _, err := chain.Append(ev); err != nil {
+		fatal(err)
+	}
+	if err := chain.Save(); err != nil {
+		fatal(err)
+	}
+	printJSON(map[string]interface{}{
+		"author":     *author,
+		"pubkey":     hex.EncodeToString(pub),
+		"registered": true,
+		"block":      chain.LastHash(),
+	})
+}
+
 func bitcoin() {
 	spec := qlab.LevelSpec(qlab.BitcoinLogicalThreshold)
 	printJSON(map[string]interface{}{
@@ -786,6 +879,28 @@ func loadChain(path string) *qlab.Chain {
 // event timestamps and submission VerifiedAt.
 func nowRFC3339() string {
 	return time.Now().UTC().Format(time.RFC3339)
+}
+
+// signEvent decodes an ed25519 private key from hex and signs the canonical
+// payload of ev. Returns the signature bytes.
+func signEvent(keyHex string, ev qlab.Event) ([]byte, error) {
+	priv, err := hex.DecodeString(keyHex)
+	if err != nil {
+		return nil, fmt.Errorf("invalid -key hex: %w", err)
+	}
+	return qlab.SignEvent(priv, ev)
+}
+
+// decodePubKeyHex decodes a hex ed25519 public key and validates its length.
+func decodePubKeyHex(hexStr string) ([]byte, error) {
+	pub, err := hex.DecodeString(hexStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid pubkey hex: %w", err)
+	}
+	if !qlab.ValidPublicKey(pub) {
+		return nil, fmt.Errorf("invalid ed25519 public key: %d bytes (want 32)", len(pub))
+	}
+	return pub, nil
 }
 
 func printJSON(v interface{}) {
