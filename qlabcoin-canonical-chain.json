@@ -48,6 +48,28 @@
           "timestamp": "2026-07-02T19:22:06Z"
         }
       ]
+    },
+    {
+      "index": 3,
+      "prev_hash": "02abe87fd00f5c600eb41ebbe887c94740a7cd938ebe5056d7ed03733b3fbe1d",
+      "events": [
+        {
+          "type": "harden",
+          "level": 1,
+          "timestamp": "2026-07-02T19:45:38Z"
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "prev_hash": "aaacd1a755643a0277c7cae1961c488e6f505813539d45a1932025f62d91523b",
+      "events": [
+        {
+          "type": "reopen",
+          "level": 1,
+          "timestamp": "2026-07-02T19:45:39Z"
+        }
+      ]
     }
   ]
 }
