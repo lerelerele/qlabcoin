@@ -6,10 +6,10 @@ coverage.out
 .DS_Store
 Thumbs.db
 # Local append-only event chain (Phase 2)
-qlabcoin-chain.json
-qlabcoin-chain.json.tmp
+attack-qubits-chain.json
+attack-qubits-chain.json.tmp
 # Locally generated public dashboard (Phase 5); a committed snapshot lives in examples/
-qlabcoin-dashboard.html
+attack-qubits-dashboard.html
 
 # Private ed25519 keys (signed-identity v2): never commit real author keys.
 *.priv

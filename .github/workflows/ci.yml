@@ -22,11 +22,11 @@ jobs:
         run: go test ./...
 
       - name: Build
-        run: go build -o bin/qlabcoin ./cmd/qlabcoin
+        run: go build -o bin/attack-qubits ./cmd/attack-qubits
 
       # The canonical chain is the source of truth. Every PR must leave it
       # structurally intact (hash links) and semantically valid: replay
       # re-runs each recorded submission through its family's classical
       # verifier, so an unverifiable solution fails the build.
       - name: Verify canonical chain
-        run: ./bin/qlabcoin verify-chain -chain qlabcoin-canonical-chain.json
+        run: ./bin/attack-qubits verify-chain -chain attack-qubits-canonical-chain.json

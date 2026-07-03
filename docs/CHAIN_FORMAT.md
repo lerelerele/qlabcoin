@@ -1,7 +1,7 @@
 # Chain Format
 
-State in Qlabcoin lives on an **append-only event chain** persisted as a single
-JSON file (default `qlabcoin-chain.json`, not committed). The chain is the single
+State in Attack Qubits lives on an **append-only event chain** persisted as a single
+JSON file (default `attack-qubits-chain.json`, not committed). The chain is the single
 source of truth; the live challenge registry is *derived* from it by replaying
 the events.
 
@@ -49,7 +49,7 @@ block_hash = sha256( canonical_json({ prev_hash, events }) )
 `Nonce` is reserved for future use and currently 0; it is excluded from the hash
 so it can be repurposed later without redefining chain identity.
 
-Use `qlabcoin verify-chain` to check that every `prev_hash` matches the recomputed
+Use `attack-qubits verify-chain` to check that every `prev_hash` matches the recomputed
 hash of the previous block, and that all events replay to a valid registry. Any
 edit to a recorded event (or to a link) breaks a hash link — except an edit to
 the *last* block, which no later `prev_hash` binds. To close that gap, replay
@@ -104,8 +104,8 @@ event on a level that is not broken/hardened/reopened is invalid and fails
 Attributed events (`submit`, `reproduce`) are **signed** with ed25519; the
 signature is mandatory (strict mode). The flow:
 
-1. An author generates a key pair offline (`qlabcoin keygen -author <handle>`).
-2. They publish the public key on chain (`qlabcoin register -author <handle>
+1. An author generates a key pair offline (`attack-qubits keygen -author <handle>`).
+2. They publish the public key on chain (`attack-qubits register -author <handle>
    -pubkey <hex>`), which appends a `register` event. Re-registering rotates the
    key (the newest key wins).
 3. They sign `submit`/`reproduce` events with the matching private key
@@ -133,7 +133,7 @@ real world" remains a social/PR concern (v1: GitHub PR author; this v2: the key)
 ## Derived state
 
 The registry is never stored separately. To answer "what is the state of level
-N?", Qlabcoin replays the chain from the genesis block and applies each event
+N?", Attack Qubits replays the chain from the genesis block and applies each event
 with the same transition rules used when recording it:
 
 ```text
@@ -152,10 +152,10 @@ recorded solution fails classical re-verification for its level's family.
 ## CLI
 
 ```bash
-qlabcoin history      # dump the chain (blocks + hashes + events)
-qlabcoin verify-chain # check integrity + replay
-qlabcoin state        # derived registry (replayed from the chain)
-qlabcoin reproduce    # append an independent corroboration of a broken level
+attack-qubits history      # dump the chain (blocks + hashes + events)
+attack-qubits verify-chain # check integrity + replay
+attack-qubits state        # derived registry (replayed from the chain)
+attack-qubits reproduce    # append an independent corroboration of a broken level
 ```
 
 `submit`, `transition`, and `reproduce` append a block and save the chain; they

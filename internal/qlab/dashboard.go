@@ -12,7 +12,7 @@ import (
 // can be published as-is, e.g. on GitHub Pages.
 
 // dashboardNote is the honest-language footer required by the threat model.
-const dashboardNote = "Qlabcoin measures demonstrated logical attack qubits. " +
+const dashboardNote = "Attack Qubits measures demonstrated logical attack qubits. " +
 	"Nothing here claims that current hardware can break Bitcoin; the profiles " +
 	"only re-price the reference threshold under different QEC assumptions."
 
@@ -87,7 +87,7 @@ func BuildDashboard(c *Chain, r *Registry, generatedAt string) Dashboard {
 		DistancePercent:    100 * float64(maxBroken) / float64(BitcoinLogicalThreshold),
 		Distances:          DistanceReport(maxBroken),
 		Demonstrations:     demos,
-		RepoURL:            "https://github.com/lerelerele/qlabcoin",
+		RepoURL:            "https://github.com/lerelerele/attack-qubits",
 		Note:               dashboardNote,
 	}
 	if maxBroken > 0 {
@@ -174,7 +174,7 @@ var dashboardTmpl = template.Must(template.New("dashboard").Parse(`<!DOCTYPE htm
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Qlabcoin Quantum Clock</title>
+<title>Attack Qubits Quantum Clock</title>
 <style>
   body{font-family:system-ui,-apple-system,sans-serif;background:#0e1116;color:#e6e6e6;margin:0;padding:2rem;}
   .wrap{max-width:920px;margin:0 auto;}
@@ -200,7 +200,7 @@ var dashboardTmpl = template.Must(template.New("dashboard").Parse(`<!DOCTYPE htm
 </style>
 </head>
 <body><div class="wrap">
-<h1>Qlabcoin Quantum Clock</h1>
+<h1>Attack Qubits Quantum Clock</h1>
 <div class="sub">{{.Project}} v{{.Version}} &middot; generated {{.GeneratedAt}} &middot; chain: {{.Blocks}} blocks, head {{printf "%.12s" .LastHash}}&hellip;</div>
 <div class="grid">
   <div class="card"><div class="k">Highest broken level</div><div class="v">{{.MaxBrokenLevel}}</div>{{with .MaxBrokenFamily}}<div class="s">{{.}}</div>{{end}}</div>

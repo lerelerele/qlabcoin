@@ -11,7 +11,7 @@ import (
 
 // DefaultChainPath is the local file that stores the append-only event chain.
 // It is intentionally a local, non-committed file.
-const DefaultChainPath = "qlabcoin-chain.json"
+const DefaultChainPath = "attack-qubits-chain.json"
 
 // ZeroHash is the prev_hash anchor of the genesis block (64 hex zeros).
 const ZeroHash = "0000000000000000000000000000000000000000000000000000000000000000"

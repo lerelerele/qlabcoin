@@ -25,17 +25,17 @@ jobs:
           go-version: '1.26'
 
       - name: Build CLI
-        run: go build -o bin/qlabcoin ./cmd/qlabcoin
+        run: go build -o bin/attack-qubits ./cmd/attack-qubits
 
       - name: Verify canonical chain
-        run: ./bin/qlabcoin verify-chain -chain qlabcoin-canonical-chain.json
+        run: ./bin/attack-qubits verify-chain -chain attack-qubits-canonical-chain.json
 
       # Find levels that are broken but not yet reopened (i.e. awaiting the
       # harden + reopen step). The state JSON is parsed with jq.
       - name: Find freshly broken levels
         id: broken
         run: |
-          ./bin/qlabcoin state -chain qlabcoin-canonical-chain.json > state.json
+          ./bin/attack-qubits state -chain attack-qubits-canonical-chain.json > state.json
           # Extract level numbers whose state is exactly "broken".
           BROKEN=$(jq -r '[.entries[] | select(.state=="broken") | .level] | join(",")' state.json)
           echo "levels=$BROKEN" >> "$GITHUB_OUTPUT"
@@ -64,10 +64,10 @@ jobs:
               --body "A submission merged to main and level **${level}** is now \`broken\` on the canonical chain. The next step in the research cycle is to apply the mitigation and open the next level:
 
           \`\`\`bash
-          go run ./cmd/qlabcoin transition ${level} hardened -chain qlabcoin-canonical-chain.json
-          go run ./cmd/qlabcoin transition ${level} reopened -chain qlabcoin-canonical-chain.json
+          go run ./cmd/attack-qubits transition ${level} hardened -chain attack-qubits-canonical-chain.json
+          go run ./cmd/attack-qubits transition ${level} reopened -chain attack-qubits-canonical-chain.json
           \`\`\`
 
-          Then commit \`qlabcoin-canonical-chain.json\`, open a PR, and merge it. Once the level is \`reopened\` this issue can be closed."
+          Then commit \`attack-qubits-canonical-chain.json\`, open a PR, and merge it. Once the level is \`reopened\` this issue can be closed."
             echo "Opened reminder issue for level ${level}."
           done

@@ -1,6 +1,6 @@
-# Contributing to Qlabcoin
+# Contributing to Attack Qubits
 
-Qlabcoin is a public research clock. A contribution is a **claim recorded on the
+Attack Qubits is a public research clock. A contribution is a **claim recorded on the
 canonical chain**: you demonstrate work against a level's challenge, and the
 project records it — auditable, timestamped, and independently reproducible.
 There is no token and no financial reward (see the Non-Goals in the spec). What
@@ -8,7 +8,7 @@ you earn is a public, verifiable record of the demonstration, with your name on
 it.
 
 The canonical chain lives in this repo at
-[`qlabcoin-canonical-chain.json`](qlabcoin-canonical-chain.json). It is the
+[`attack-qubits-canonical-chain.json`](attack-qubits-canonical-chain.json). It is the
 single source of truth; the registry, mitigation posture, and dashboard are all
 derived from it. Changes are made by pull request and accepted by merge.
 
@@ -23,16 +23,16 @@ You need [Go 1.26+](https://go.dev/dl/) and a GitHub account.
 
 ```bash
 # 1. Fork the repo on GitHub (use the Fork button), then:
-git clone https://github.com/<YOUR-HANDLE>/qlabcoin.git
-cd qlabcoin
+git clone https://github.com/<YOUR-HANDLE>/attack-qubits.git
+cd attack-qubits
 
 # 2. Build the CLI to confirm everything works:
 go build ./...
 go test ./...
 
 # 3. See the current clock and the open challenges:
-go run ./cmd/qlabcoin state -chain qlabcoin-canonical-chain.json
-go run ./cmd/qlabcoin challenge 2          # the lowest open level
+go run ./cmd/attack-qubits state -chain attack-qubits-canonical-chain.json
+go run ./cmd/attack-qubits challenge 2          # the lowest open level
 ```
 
 ## How to break a level (end to end)
@@ -67,9 +67,9 @@ see the target and hint):
 Check your solution locally before submitting:
 
 ```bash
-go run ./cmd/qlabcoin verify 1 -measured '{"0":512,"1":488}'      # levels 1-3
-go run ./cmd/qlabcoin verify 5 -solution 36                        # levels 4-18
-go run ./cmd/qlabcoin verify 19 -solution <d>                      # levels 19+
+go run ./cmd/attack-qubits verify 1 -measured '{"0":512,"1":488}'      # levels 1-3
+go run ./cmd/attack-qubits verify 5 -solution 36                        # levels 4-18
+go run ./cmd/attack-qubits verify 19 -solution <d>                      # levels 19+
 ```
 
 ### Step 2 — Set up your identity (once)
@@ -78,7 +78,7 @@ Submissions are **signed with ed25519**. Generate a key pair offline and keep
 the private key secret:
 
 ```bash
-go run ./cmd/qlabcoin keygen -author <your-handle>
+go run ./cmd/attack-qubits keygen -author <your-handle>
 # prints {author, pubkey, privkey}. Save privkey offline; NEVER commit or share it.
 ```
 
@@ -87,9 +87,9 @@ go run ./cmd/qlabcoin keygen -author <your-handle>
 Append a `register` event to the canonical chain:
 
 ```bash
-go run ./cmd/qlabcoin register -author <your-handle> \
+go run ./cmd/attack-qubits register -author <your-handle> \
   -pubkey <pubkey-from-keygen> \
-  -chain qlabcoin-canonical-chain.json
+  -chain attack-qubits-canonical-chain.json
 ```
 
 > **Ordering:** if this is your first claim and you put `register` and `submit`
@@ -100,14 +100,14 @@ go run ./cmd/qlabcoin register -author <your-handle> \
 ### Step 4 — Record your solution signed
 
 ```bash
-go run ./cmd/qlabcoin submit 1 \
+go run ./cmd/attack-qubits submit 1 \
   -author <your-handle> -key <privkey-from-keygen> \
   -measured '{"0":512,"1":488}' \
   -circuit sha256:<hash-of-your-circuit> \
   -circuit-desc "Single-qubit Hadamard plus-state, ~1000 shots" \
   -repro-notes "shots, simulator/device, run details" \
   -proof "why the classical check passes" \
-  -chain qlabcoin-canonical-chain.json
+  -chain attack-qubits-canonical-chain.json
 ```
 
 (For levels 4-18 use `-solution <order>` instead of `-measured`; for 19+ use
@@ -116,15 +116,15 @@ go run ./cmd/qlabcoin submit 1 \
 ### Step 5 — Verify and open a PR
 
 ```bash
-go run ./cmd/qlabcoin verify-chain -chain qlabcoin-canonical-chain.json
+go run ./cmd/attack-qubits verify-chain -chain attack-qubits-canonical-chain.json
 git checkout -b break-level-N
-git add qlabcoin-canonical-chain.json
+git add attack-qubits-canonical-chain.json
 git commit -m "Break level N (<family>)"
 git push origin break-level-N
 ```
 
 Then open a pull request against `main` from your fork. **Commit only the change
-to `qlabcoin-canonical-chain.json`** — not your private key.
+to `attack-qubits-canonical-chain.json`** — not your private key.
 
 ## What happens after your PR is merged
 
@@ -132,8 +132,8 @@ to `qlabcoin-canonical-chain.json`** — not your private key.
    (your handle appears on the public dashboard under "Demonstrations").
 2. **A maintainer** then runs the lifecycle step that opens the next level:
    ```bash
-   go run ./cmd/qlabcoin transition N hardened -chain qlabcoin-canonical-chain.json
-   go run ./cmd/qlabcoin transition N reopened -chain qlabcoin-canonical-chain.json
+   go run ./cmd/attack-qubits transition N hardened -chain attack-qubits-canonical-chain.json
+   go run ./cmd/attack-qubits transition N reopened -chain attack-qubits-canonical-chain.json
    ```
    This is the "apply mitigation → open the next level" step. It is **not** your
    job as a contributor — when a level is freshly broken, CI opens a reminder
@@ -163,17 +163,17 @@ Already broken a level? You can **corroborate** someone else's result (or your
 own) with a `reproduce` event, also signed:
 
 ```bash
-go run ./cmd/qlabcoin reproduce 1 \
+go run ./cmd/attack-qubits reproduce 1 \
   -author <your-handle> -key <privkey-from-keygen> \
   -circuit sha256:<your-reproduction-circuit> \
   -result reproduced \
-  -chain qlabcoin-canonical-chain.json
+  -chain attack-qubits-canonical-chain.json
 ```
 
 Positive reproductions raise the level's reproduction counter on the dashboard.
 
 ## Honest-language rule
 
-Qlabcoin measures **demonstrated logical attack qubits**, not physical-qubit
+Attack Qubits measures **demonstrated logical attack qubits**, not physical-qubit
 counts or hardware promises. Do not describe a result as breaking Bitcoin, and
 do not equate physical qubits with logical qubits. See `docs/THREAT_MODEL.md`.

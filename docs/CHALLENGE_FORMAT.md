@@ -4,8 +4,13 @@ Challenges are JSON documents. They are produced by the CLI and have a
 deterministic id of the form `qlab-L<NNN>-<hash10>`, where `<hash10>` is the
 first 10 hex chars of `sha256("qlabcoin:<level>:<family>")`.
 
+> The `qlabcoin:` domain-separation tag is the project's original name, frozen
+> at genesis. It is a protocol constant, not branding: changing it would change
+> every derived challenge and invalidate submissions already recorded on the
+> canonical chain.
+
 ```bash
-go run ./cmd/qlabcoin challenge 1
+go run ./cmd/attack-qubits challenge 1
 ```
 
 ```json
@@ -88,9 +93,9 @@ secrecy.
 ## Verification per family
 
 ```bash
-go run ./cmd/qlabcoin verify 1  -measured '{"0":512,"1":488}'    # distribution
-go run ./cmd/qlabcoin verify 5  -solution 36                     # order
-go run ./cmd/qlabcoin verify 19 -solution <d>                    # discrete log
+go run ./cmd/attack-qubits verify 1  -measured '{"0":512,"1":488}'    # distribution
+go run ./cmd/attack-qubits verify 5  -solution 36                     # order
+go run ./cmd/attack-qubits verify 19 -solution <d>                    # discrete log
 ```
 
 ## Toy order-finding targets
@@ -100,7 +105,7 @@ challenge `target` carries a deterministic group: a base `g` and a prime modulus
 `m`, both derived from the level so the same level always yields the same target.
 
 ```bash
-go run ./cmd/qlabcoin challenge 5
+go run ./cmd/attack-qubits challenge 5
 ```
 
 ```json
@@ -126,17 +131,17 @@ broken` in one step. The event is signed, so `-author` and `-key` are mandatory
 (see `docs/CHAIN_FORMAT.md` — "Signed events & identity"):
 
 ```bash
-go run ./cmd/qlabcoin submit 5 -solution 36 -circuit sha256:example \
+go run ./cmd/attack-qubits submit 5 -solution 36 -circuit sha256:example \
   -author <handle> -key <privkey-hex>
 ```
 
 State is **not** stored separately: it is derived by replaying the append-only
-event chain (default `qlabcoin-chain.json`; see `docs/CHAIN_FORMAT.md`). The
+event chain (default `attack-qubits-chain.json`; see `docs/CHAIN_FORMAT.md`). The
 remaining manual steps append their own events via `transition`:
 
 ```bash
-go run ./cmd/qlabcoin transition 5 hardened
-go run ./cmd/qlabcoin transition 5 reopened   # opens level 6
+go run ./cmd/attack-qubits transition 5 hardened
+go run ./cmd/attack-qubits transition 5 reopened   # opens level 6
 ```
 
 See `examples/submission-005.json` for a full winning entry.
@@ -162,5 +167,5 @@ solver — it is not derivable from the challenge source):
 }
 ```
 
-Qlabcoin must verify the solution classically before advancing the clock, both
+Attack Qubits must verify the solution classically before advancing the clock, both
 at submit time and on every chain replay.

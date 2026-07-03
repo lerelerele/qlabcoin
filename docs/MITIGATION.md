@@ -2,7 +2,7 @@
 
 A didactic model of the post-quantum hardening ladder. It is **not** a wallet and
 **not** a transaction engine: there is no real money. Each rung represents a
-defensive *posture*; `qlabcoin mitigation` reports which posture is currently
+defensive *posture*; `attack-qubits mitigation` reports which posture is currently
 implied by the academic clock, and `EvaluateSpend` checks whether a hypothetical
 spend would be acceptable under a given posture and why.
 
@@ -45,10 +45,10 @@ A spend request describes the situation around a key/UTXO; the decision says
 whether it is acceptable under a mode:
 
 ```bash
-qlabcoin mitigation -mode C -request '{"pubkey_exposed":true,"has_live_utxo":true}'
+attack-qubits mitigation -mode C -request '{"pubkey_exposed":true,"has_live_utxo":true}'
 # -> allowed: false, reason: "live UTXO on an exposed public key is not allowed"
 
-qlabcoin mitigation -mode F -request '{"signature_scheme":"ml-dsa"}'
+attack-qubits mitigation -mode F -request '{"signature_scheme":"ml-dsa"}'
 # -> allowed: true, reason: "post-quantum signature (ml-dsa) accepted"
 ```
 

@@ -1,7 +1,7 @@
 name: publish-dashboard
 
 # Regenerate the public dashboard from the canonical chain and publish it to
-# GitHub Pages whenever main advances. This keeps https://<user>.github.io/qlabcoin/
+# GitHub Pages whenever main advances. This keeps https://<user>.github.io/attack-qubits/
 # in sync with the public clock without a manual push.
 
 on:
@@ -35,16 +35,16 @@ jobs:
           go-version: '1.26'
 
       - name: Build CLI
-        run: go build -o bin/qlabcoin ./cmd/qlabcoin
+        run: go build -o bin/attack-qubits ./cmd/attack-qubits
 
       # The canonical chain is the source of truth. This also doubles as a
       # check: if verify-chain fails (tampered links, bad signature, or an
       # unverifiable recorded solution) the dashboard does not get published.
       - name: Verify canonical chain
-        run: ./bin/qlabcoin verify-chain -chain qlabcoin-canonical-chain.json
+        run: ./bin/attack-qubits verify-chain -chain attack-qubits-canonical-chain.json
 
       - name: Regenerate dashboard
-        run: ./bin/qlabcoin dashboard -html -out dashboard.html -chain qlabcoin-canonical-chain.json
+        run: ./bin/attack-qubits dashboard -html -out dashboard.html -chain attack-qubits-canonical-chain.json
 
       - name: Setup Pages
         id: pages

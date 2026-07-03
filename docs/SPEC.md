@@ -1,8 +1,8 @@
-# Qlabcoin Specification Draft
+# Attack Qubits Specification Draft
 
 ## 1. Purpose
 
-Qlabcoin is a challenge chain for studying when quantum hardware can perform useful attacks against small cryptographic targets.
+Attack Qubits is a challenge chain for studying when quantum hardware can perform useful attacks against small cryptographic targets.
 
 The project must not imply that current quantum hardware can break Bitcoin. Its role is to measure progress from one useful logical attack qubit toward larger cryptographic attacks.
 
@@ -19,7 +19,7 @@ attack_qubit
   A logical qubit actually used in a submitted attack circuit.
 ```
 
-The Qlabcoin level is:
+The Attack Qubits level is:
 
 ```text
 level = demonstrated_attack_qubits
@@ -27,7 +27,7 @@ level = demonstrated_attack_qubits
 
 ## 3. Reference Bitcoin Threshold
 
-For elliptic-curve discrete logarithms over prime fields, Qlabcoin uses this initial resource model:
+For elliptic-curve discrete logarithms over prime fields, Attack Qubits uses this initial resource model:
 
 ```text
 Q(n) = 9n + 2 ceil(log2 n) + 10

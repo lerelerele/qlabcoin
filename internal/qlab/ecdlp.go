@@ -166,7 +166,7 @@ func ecdlpParamsForLevel(level int) ecdlpParams {
 		return prm
 	}
 	// Unreachable in practice: nonsingular curves with points are abundant.
-	panic(fmt.Sprintf("qlabcoin: could not derive an ECDLP challenge for level %d", level))
+	panic(fmt.Sprintf("attack-qubits: could not derive an ECDLP challenge for level %d", level))
 }
 
 // buildCertifiedCurve finds a prime-order curve of the target size and a
@@ -439,6 +439,8 @@ func nextPrimeBig(n *big.Int) *big.Int {
 }
 
 // hashToBig derives a deterministic big integer from a labeled level/seed pair.
+// The "qlabcoin" domain-separation tag is the project's original name, frozen
+// at genesis (see ChallengeID in model.go).
 func hashToBig(label string, level, seed int) *big.Int {
 	sum := sha256.Sum256([]byte(fmt.Sprintf("qlabcoin:ecdlp:%s:%d:%d", label, level, seed)))
 	return new(big.Int).SetBytes(sum[:])

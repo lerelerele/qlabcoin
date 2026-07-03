@@ -74,6 +74,6 @@
 
 - LICENSE, CONTRIBUTING.md (submission-by-PR against the canonical chain), and
   CI (`.github/workflows/ci.yml`) are in place; the canonical chain
-  (`qlabcoin-canonical-chain.json`) starts at genesis.
+  (`attack-qubits-canonical-chain.json`) starts at genesis.
 - Remaining: create the public remote and push; host the dashboard; accept
   university challenge submissions and reproducibility reviews as PRs.

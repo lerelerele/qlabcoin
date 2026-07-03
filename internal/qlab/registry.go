@@ -5,7 +5,7 @@ import (
 	"sort"
 )
 
-// Challenge lifecycle states (see docs/QLABCOIN_SPEC.md §5):
+// Challenge lifecycle states (see docs/SPEC.md §5):
 //
 //	open      challenge published
 //	claimed   a solver submitted a report + solution

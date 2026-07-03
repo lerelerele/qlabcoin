@@ -70,7 +70,7 @@ func TestBuildDashboardFresh(t *testing.T) {
 func TestRenderTextContainsKeyFacts(t *testing.T) {
 	txt := dashboardFromLifecycle(t).RenderText()
 	for _, want := range []string{
-		"Qlabcoin Quantum Clock",
+		"Attack Qubits Quantum Clock",
 		"Highest broken level      : 5 (toy-order-finding)",
 		"Mode C",
 		"2330 logical qubits",
@@ -92,7 +92,7 @@ func TestRenderHTMLIsSelfContained(t *testing.T) {
 	}
 	for _, want := range []string{
 		"<!DOCTYPE html>",
-		"Qlabcoin Quantum Clock",
+		"Attack Qubits Quantum Clock",
 		"2330",
 		"optimistic",
 		"conservative",

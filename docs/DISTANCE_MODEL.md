@@ -1,6 +1,6 @@
 # Bitcoin Distance Model (Phase 5)
 
-Only one clock ever advances in Qlabcoin: the **academic clock**, i.e. the
+Only one clock ever advances in Attack Qubits: the **academic clock**, i.e. the
 highest level demonstrated on the chain (demonstrated logical attack qubits).
 The distance model does not add a second clock. It translates the fixed Bitcoin
 logical-qubit threshold into physical-qubit and processor terms under several
@@ -68,11 +68,11 @@ on the chain. This is the project's honest-language rule applied to the model.
 ## CLI
 
 ```bash
-qlabcoin distance                 # profiles vs the chain's highest broken level
-qlabcoin distance -level 50       # hypothetical clock position, no chain needed
-qlabcoin dashboard                # text quantum clock (chain-derived)
-qlabcoin dashboard -html          # write qlabcoin-dashboard.html (self-contained)
-qlabcoin dashboard -html -out -   # HTML to stdout
+attack-qubits distance                 # profiles vs the chain's highest broken level
+attack-qubits distance -level 50       # hypothetical clock position, no chain needed
+attack-qubits dashboard                # text quantum clock (chain-derived)
+attack-qubits dashboard -html          # write attack-qubits-dashboard.html (self-contained)
+attack-qubits dashboard -html -out -   # HTML to stdout
 ```
 
 The HTML dashboard is a single static page with no scripts and no external

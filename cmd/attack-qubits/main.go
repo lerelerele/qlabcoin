@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"qlabcoin/internal/qlab"
+	"github.com/lerelerele/attack-qubits/internal/qlab"
 )
 
 func main() {
@@ -59,25 +59,25 @@ func main() {
 }
 
 func usage() {
-	fmt.Printf(`Qlabcoin %s
+	fmt.Printf(`Attack Qubits %s
 
 Commands:
-  qlabcoin clock [-max 20]
-  qlabcoin level <n>
-  qlabcoin challenge <n>
-  qlabcoin verify <n> [-solution <k|d>] [-measured <json>]
-  qlabcoin keygen -author <handle>                          # generate an ed25519 key pair (offline)
-  qlabcoin register -author <handle> -pubkey <hex> [-chain <path>]   # publish/rotate a public key on chain
-  qlabcoin submit <n> -circuit <sha256:...> -author <handle> -key <hex> [-solution <k|d>] [-measured <json>] [-backend <json>] [-circuit-desc <text>] [-repro-notes <text>] [-proof <text>] [-chain <path>]
-  qlabcoin transition <n> <state> [-chain <path>]
-  qlabcoin reproduce <n> -author <handle> -key <hex> -circuit <sha256:...> -result reproduced|failed [-backend <json>] [-notes <text>] [-chain <path>]
-  qlabcoin state [-chain <path>]
-  qlabcoin history [-chain <path>]
-  qlabcoin verify-chain [-chain <path>]
-  qlabcoin mitigation [-list | -mode <A-F> -request <json> | -chain <path>]
-  qlabcoin distance [-level <n>] [-chain <path>]
-  qlabcoin dashboard [-html] [-out <file>] [-chain <path>]
-  qlabcoin bitcoin
+  attack-qubits clock [-max 20]
+  attack-qubits level <n>
+  attack-qubits challenge <n>
+  attack-qubits verify <n> [-solution <k|d>] [-measured <json>]
+  attack-qubits keygen -author <handle>                          # generate an ed25519 key pair (offline)
+  attack-qubits register -author <handle> -pubkey <hex> [-chain <path>]   # publish/rotate a public key on chain
+  attack-qubits submit <n> -circuit <sha256:...> -author <handle> -key <hex> [-solution <k|d>] [-measured <json>] [-backend <json>] [-circuit-desc <text>] [-repro-notes <text>] [-proof <text>] [-chain <path>]
+  attack-qubits transition <n> <state> [-chain <path>]
+  attack-qubits reproduce <n> -author <handle> -key <hex> -circuit <sha256:...> -result reproduced|failed [-backend <json>] [-notes <text>] [-chain <path>]
+  attack-qubits state [-chain <path>]
+  attack-qubits history [-chain <path>]
+  attack-qubits verify-chain [-chain <path>]
+  attack-qubits mitigation [-list | -mode <A-F> -request <json> | -chain <path>]
+  attack-qubits distance [-level <n>] [-chain <path>]
+  attack-qubits dashboard [-html] [-out <file>] [-chain <path>]
+  attack-qubits bitcoin
 
 States: open, claimed, verified, broken, hardened, reopened
 Solutions: levels 1-3 take -measured (outcome counts JSON); levels 4-18 take
@@ -734,12 +734,12 @@ func distance(args []string) {
 }
 
 // dashboard prints the quantum-clock snapshot derived from the chain. With
-// -html it writes a self-contained static page (default qlabcoin-dashboard.html,
+// -html it writes a self-contained static page (default attack-qubits-dashboard.html,
 // or stdout with -out -) suitable for publishing as-is.
 func dashboard(args []string) {
 	fs := flag.NewFlagSet("dashboard", flag.ExitOnError)
 	htmlFlag := fs.Bool("html", false, "write a self-contained HTML dashboard instead of text")
-	out := fs.String("out", "", "output file for -html (default qlabcoin-dashboard.html; '-' for stdout)")
+	out := fs.String("out", "", "output file for -html (default attack-qubits-dashboard.html; '-' for stdout)")
 	chainPath := fs.String("chain", qlab.DefaultChainPath, "chain file path")
 	_ = fs.Parse(reorderFlags(args))
 	chain := loadChain(*chainPath)
@@ -762,7 +762,7 @@ func dashboard(args []string) {
 	}
 	path := *out
 	if path == "" {
-		path = "qlabcoin-dashboard.html"
+		path = "attack-qubits-dashboard.html"
 	}
 	if err := os.WriteFile(path, []byte(html), 0644); err != nil {
 		fatal(err)
@@ -841,7 +841,7 @@ func bitcoin() {
 		"logical_qubits":           qlab.LogicalQubitsForECDLP(qlab.BitcoinCurveBits),
 		"toffoli_gates":            spec.EstimatedToffoliGates,
 		"warning":                  "Logical-qubit threshold only; not a practical break claim without depth, runtime, and physical error-correction resources.",
-		"qlabcoin_reference_level": qlab.BitcoinLogicalThreshold,
+		"attack_qubits_reference_level": qlab.BitcoinLogicalThreshold,
 	})
 }
 

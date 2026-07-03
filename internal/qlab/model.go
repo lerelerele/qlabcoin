@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	ProjectName             = "Qlabcoin"
+	ProjectName             = "Attack Qubits"
 	Version                 = "0.0.1"
 	BitcoinCurveBits        = 256
 	BitcoinLogicalThreshold = 2330
@@ -134,6 +134,10 @@ func ChallengeForLevel(level int) Challenge {
 	}
 }
 
+// ChallengeID derives the deterministic challenge id for a level. The
+// "qlabcoin" domain-separation tag is the project's original name, frozen at
+// genesis: changing it would change every derived challenge and invalidate
+// submissions already recorded on the canonical chain.
 func ChallengeID(level int, family string) string {
 	sum := sha256.Sum256([]byte(fmt.Sprintf("qlabcoin:%d:%s", level, family)))
 	return fmt.Sprintf("qlab-L%03d-%s", level, hex.EncodeToString(sum[:])[:10])

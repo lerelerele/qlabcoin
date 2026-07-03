@@ -2,7 +2,7 @@
   "curve_bits": 256,
   "label": "bitcoin-reference",
   "logical_qubits": 2330,
-  "qlabcoin_reference_level": 2330,
+  "attack_qubits_reference_level": 2330,
   "toffoli_gates": "1.287e+11",
   "warning": "Logical-qubit threshold only; not a practical break claim without depth, runtime, and physical error-correction resources."
 }
