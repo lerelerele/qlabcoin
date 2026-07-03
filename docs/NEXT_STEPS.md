@@ -12,13 +12,15 @@ implemented, and there is a public dashboard. See the `docs/` for the model and
 Attack Qubits only does its job as a *public* research clock. The remaining work is
 about running it in the open rather than adding engine features.
 
-1. **Publish the repository** as research-only. `LICENSE` (MIT), `CONTRIBUTING.md`
-   (submission-by-PR against the canonical chain), and CI (`.github/workflows/ci.yml`)
-   are in place; what remains is creating the public remote and pushing.
-2. **Host the dashboard.** `attack-qubits dashboard -html` emits a self-contained page;
-   publish it (e.g. GitHub Pages) and regenerate it from the canonical chain.
-3. **Seed the canonical chain.** `attack-qubits-canonical-chain.json` currently holds
-   only the genesis block — the honest starting state. Real demonstrations land
+1. **Publish the repository** — done: <https://github.com/lerelerele/attack-qubits>
+   (originally published as `qlabcoin`, renamed 2026-07-03; the `qlabcoin:`
+   challenge-derivation tags are frozen at genesis as protocol constants).
+2. **Host the dashboard** — done: <https://lerelerele.github.io/attack-qubits/>,
+   regenerated from the canonical chain by `.github/workflows/publish-dashboard.yml`
+   on every push to `main`.
+3. **Grow the canonical chain.** `attack-qubits-canonical-chain.json` holds genesis
+   plus the maintainer's level-1 bootstrap (register, submit, harden, reopen).
+   The frontier is level 2 (Bell-pair evidence). External demonstrations land
    as PRs.
 
 ## Identity (done — v2 implemented)

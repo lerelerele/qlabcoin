@@ -2,6 +2,8 @@
 
 Attack Qubits is an educational blockchain-lab project for measuring practical quantum progress against deliberately small cryptographic challenges.
 
+**Live clock:** <https://lerelerele.github.io/attack-qubits/> — regenerated from the canonical chain on every push.
+
 It is not a cryptocurrency for value transfer. It is a public research clock: each level represents a demonstrated number of useful logical attack qubits applied to a verifiable challenge. Level 1 starts at one logical qubit, then advances step by step toward a Bitcoin-like threshold.
 
 ## Core Idea
@@ -49,6 +51,10 @@ verifier, so `challenge`, `verify`, and `submit` work end to end from level 1
 to the 2330 reference line. See `docs/CHALLENGE_FORMAT.md`.
 
 ## CLI
+
+Pure Go standard library, no dependencies. Install the binary with
+`go install github.com/lerelerele/attack-qubits/cmd/attack-qubits@latest`,
+or clone and use `go run`:
 
 ```bash
 go run ./cmd/attack-qubits clock -max 12
@@ -126,6 +132,22 @@ validated by CI (`go test` + `verify-chain`, which re-runs every recorded
 solution through its classical verifier). There is no token and no financial
 reward — what you earn is a public, auditable, timestamped record of a
 demonstration. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+## Related Work
+
+[Project Eleven's Q-Day Prize](https://www.projecteleven.com/blog/project-eleven-awards-1-btc-q-day-prize-for-largest-quantum-attack-on-elliptic-curve-cryptography-to-date)
+awarded 1 BTC in April 2026 for breaking a 15-bit elliptic-curve key on publicly
+accessible quantum hardware — the largest public demonstration of this attack
+class to date. Attack Qubits is complementary but structurally different:
+
+- A bounty is a one-off event; this is a **continuous ladder**. Every level from
+  1 qubit to the 2330-qubit reference line has a deterministic challenge and a
+  classical verifier, so progress is recorded in single-qubit steps instead of
+  announced in jumps.
+- Results here are **claims on a signed, replayable chain**, not press releases:
+  CI re-runs every recorded solution through its verifier from genesis on every
+  commit.
+- There is no prize and no token. The record itself is the reward.
 
 ## Source Assumptions
 
